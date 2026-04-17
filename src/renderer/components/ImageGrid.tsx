@@ -5,9 +5,10 @@ import { useSaveAllImages } from "@/renderer/hooks/useGemini";
 
 interface ImageGridProps {
   readonly message: Message;
+  readonly allImages: readonly GeneratedImage[];
 }
 
-export function ImageGrid({ message }: ImageGridProps) {
+export function ImageGrid({ message, allImages }: ImageGridProps) {
   const saveAll = useSaveAllImages();
   const pendingCount = message.requestedCount - message.images.length - message.errors.length;
   const showPending = !message.complete && pendingCount > 0;
@@ -19,7 +20,7 @@ export function ImageGrid({ message }: ImageGridProps) {
           .slice()
           .sort((a, b) => a.index - b.index)
           .map((image: GeneratedImage) => (
-            <ImageCard key={image.id} image={image} />
+            <ImageCard key={image.id} image={image} allImages={allImages} />
           ))}
         {showPending &&
           Array.from({ length: pendingCount }).map((_, i) => (

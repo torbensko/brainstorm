@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
-import type { Message, AttachedImage } from "@/shared/types";
+import type { Message, AttachedImage, GeneratedImage } from "@/shared/types";
 import { AspectRatio, ImageResolution } from "@/shared/types";
 import { useConversation } from "@/renderer/hooks/useConversations";
 import { useGenerate, useGeminiEvents } from "@/renderer/hooks/useGemini";
@@ -21,6 +21,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation?.messages]);
+
+  const allImages = useMemo(
+    () =>
+      conversation?.messages.flatMap((m: Message) =>
+        m.role === "assistant"
+          ? m.images.slice().sort((a: GeneratedImage, b: GeneratedImage) => a.index - b.index)
+          : [],
+      ) ?? [],
+    [conversation?.messages],
+  );
 
   const isGenerating =
     conversation?.messages.some(
@@ -96,7 +106,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
               ) : (
                 <div className="flex justify-start">
                   <div className="max-w-[90%]">
-                    <ImageGrid message={message} />
+                    <ImageGrid message={message} allImages={allImages} />
                   </div>
                 </div>
               )}

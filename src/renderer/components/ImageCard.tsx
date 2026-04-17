@@ -5,15 +5,16 @@ import { ImageLightbox } from "./ImageLightbox";
 
 interface ImageCardProps {
   readonly image: GeneratedImage;
+  readonly allImages: readonly GeneratedImage[];
 }
 
-export function ImageCard({ image }: ImageCardProps) {
+export function ImageCard({ image, allImages }: ImageCardProps) {
   const saveImage = useSaveImage();
 
   const src = `data:${image.mimeType};base64,${image.data}`;
 
   return (
-    <ImageLightbox image={image}>
+    <ImageLightbox image={image} allImages={allImages}>
       <div className="group relative cursor-pointer overflow-hidden rounded-lg border bg-muted">
         <img
           src={src}
