@@ -23,3 +23,12 @@ export function useUpdateSettings() {
     },
   });
 }
+
+export function usePickFolder() {
+  return useMutation({
+    mutationFn: () =>
+      window.electronAPI.invoke(
+        IPC_CHANNELS.SETTINGS_PICK_FOLDER
+      ) as Promise<string | null>,
+  });
+}

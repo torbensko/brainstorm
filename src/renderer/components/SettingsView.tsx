@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
-import { useSettings, useUpdateSettings } from "@/renderer/hooks/useSettings";
+import { ArrowLeft, Eye, EyeOff, FolderOpen } from "lucide-react";
+import { useSettings, useUpdateSettings, usePickFolder } from "@/renderer/hooks/useSettings";
 import {
   AspectRatio,
   ASPECT_RATIO_LABELS,
@@ -18,6 +18,7 @@ interface SettingsViewProps {
 export function SettingsView({ onBack }: SettingsViewProps) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
+  const pickFolder = usePickFolder();
 
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -29,6 +30,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     DEFAULT_SETTINGS.defaultImageResolution
   );
   const [count, setCount] = useState(4);
+  const [downloadFolder, setDownloadFolder] = useState(
+    DEFAULT_SETTINGS.downloadFolder
+  );
 
   useEffect(() => {
     if (settings) {
@@ -37,8 +41,17 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       setAspectRatio(settings.defaultAspectRatio);
       setResolution(settings.defaultImageResolution);
       setCount(settings.defaultCount);
+      setDownloadFolder(settings.downloadFolder);
     }
   }, [settings]);
+
+  const handlePickFolder = () => {
+    pickFolder.mutate(undefined, {
+      onSuccess: (folder) => {
+        if (folder) setDownloadFolder(folder);
+      },
+    });
+  };
 
   const handleSave = () => {
     updateSettings.mutate({
@@ -47,6 +60,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       defaultAspectRatio: aspectRatio,
       defaultImageResolution: resolution,
       defaultCount: count,
+      downloadFolder,
     });
   };
 
@@ -159,6 +173,30 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               onChange={(e) => setCount(parseInt(e.target.value, 10))}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
+          </div>
+
+          {/* Download Folder */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Download Folder</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={downloadFolder}
+                onChange={(e) => setDownloadFolder(e.target.value)}
+                placeholder="~/Downloads"
+                className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button
+                onClick={handlePickFolder}
+                disabled={pickFolder.isPending}
+                className="rounded-md border px-3 py-2 text-muted-foreground hover:text-foreground"
+              >
+                <FolderOpen className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Images will be saved directly to this folder
+            </p>
           </div>
 
           {/* Save button */}

@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
   // Settings
   SETTINGS_GET: "settings:get",
   SETTINGS_SET: "settings:set",
+  SETTINGS_PICK_FOLDER: "settings:pick-folder",
 
   // Conversations
   CONVERSATION_LIST: "conversation:list",

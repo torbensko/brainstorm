@@ -144,6 +144,7 @@ export interface AppSettings {
   defaultAspectRatio: AspectRatio;
   defaultImageResolution: ImageResolution;
   defaultCount: number;
+  downloadFolder: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -152,4 +153,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultAspectRatio: AspectRatio.SQUARE,
   defaultImageResolution: ImageResolution.ONE_K,
   defaultCount: 4,
+  downloadFolder: "~/Downloads",
 };
