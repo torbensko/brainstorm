@@ -108,6 +108,11 @@ export interface GenerationCompleteEvent {
   readonly messageId: string;
 }
 
+export interface TitleGeneratedEvent {
+  readonly conversationId: string;
+  readonly title: string;
+}
+
 export interface Message {
   readonly id: string;
   readonly role: "user" | "assistant";

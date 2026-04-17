@@ -5,13 +5,13 @@ import { cn } from "@/renderer/lib/utils";
 import type { ConversationSummary } from "@/shared/types";
 import {
   useConversationList,
-  useCreateConversation,
   useDeleteConversation,
 } from "@/renderer/hooks/useConversations";
 
 interface SidebarProps {
   readonly selectedId: string | null;
   readonly onSelect: (id: string) => void;
+  readonly onNew: () => void;
   readonly onDelete: (id: string) => void;
   readonly onShowSettings: () => void;
 }
@@ -19,11 +19,11 @@ interface SidebarProps {
 export function Sidebar({
   selectedId,
   onSelect,
+  onNew,
   onDelete,
   onShowSettings,
 }: SidebarProps) {
   const { data: conversations = [] } = useConversationList();
-  const createConversation = useCreateConversation();
   const deleteConversation = useDeleteConversation();
   const [search, setSearch] = useState("");
 
@@ -40,11 +40,6 @@ export function Sidebar({
       c.title.toLowerCase().includes(q)
     );
   }, [conversations, search]);
-
-  const handleNew = async () => {
-    const conv = await createConversation.mutateAsync("New Conversation");
-    onSelect(conv.id);
-  };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -93,7 +88,7 @@ export function Sidebar({
       {/* New conversation button */}
       <div className="px-3 pb-2">
         <button
-          onClick={handleNew}
+          onClick={onNew}
           className="app-no-drag flex w-full items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" />

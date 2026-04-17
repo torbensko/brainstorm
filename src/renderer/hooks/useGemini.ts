@@ -6,6 +6,7 @@ import type {
   ImageResultEvent,
   GenerationErrorEvent,
   GenerationCompleteEvent,
+  TitleGeneratedEvent,
 } from "@/shared/types";
 
 export function useGenerate() {
@@ -24,6 +25,23 @@ export function useGenerate() {
       });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
+  });
+}
+
+export function useGenerateTitle() {
+  return useMutation({
+    mutationFn: ({
+      conversationId,
+      prompt,
+    }: {
+      conversationId: string;
+      prompt: string;
+    }) =>
+      window.electronAPI.invoke(
+        IPC_CHANNELS.GEMINI_GENERATE_TITLE,
+        conversationId,
+        prompt
+      ) as Promise<void>,
   });
 }
 
@@ -70,6 +88,19 @@ export function useGeminiEvents(conversationId: string | null) {
         IPC_CHANNELS.GEMINI_GENERATION_COMPLETE,
         (_event: unknown) => {
           const event = _event as GenerationCompleteEvent;
+          if (event.conversationId === conversationId) {
+            invalidateConversation();
+            queryClient.invalidateQueries({ queryKey: ["conversations"] });
+          }
+        }
+      )
+    );
+
+    cleanups.push(
+      window.electronAPI.on(
+        IPC_CHANNELS.GEMINI_TITLE_GENERATED,
+        (_event: unknown) => {
+          const event = _event as TitleGeneratedEvent;
           if (event.conversationId === conversationId) {
             invalidateConversation();
             queryClient.invalidateQueries({ queryKey: ["conversations"] });

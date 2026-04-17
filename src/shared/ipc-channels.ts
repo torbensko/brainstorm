@@ -7,6 +7,8 @@ export const IPC_CHANNELS = {
   GEMINI_GENERATION_COMPLETE: "gemini:generation-complete",
 
   GEMINI_LIST_MODELS: "gemini:list-models",
+  GEMINI_GENERATE_TITLE: "gemini:generate-title",
+  GEMINI_TITLE_GENERATED: "gemini:title-generated",
 
   // Settings
   SETTINGS_GET: "settings:get",

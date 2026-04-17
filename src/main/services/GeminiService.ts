@@ -8,12 +8,13 @@ import type {
   ImageResultEvent,
   GenerationErrorEvent,
   GenerationCompleteEvent,
+  TitleGeneratedEvent,
   GeminiModelInfo,
   Message,
 } from "@/shared/types";
 import { NANO_BANANA_MODELS } from "@/shared/types";
 import { getSettings } from "./SettingsService";
-import { addMessage, updateMessage } from "./ConversationService";
+import { addMessage, updateMessage, updateConversationTitle } from "./ConversationService";
 
 const activeGenerations = new Map<string, AbortController>();
 
@@ -236,5 +237,47 @@ export function cancelGeneration(
   if (controller) {
     controller.abort();
     activeGenerations.delete(key);
+  }
+}
+
+const TITLE_MODEL = "gemini-2.5-flash";
+
+/**
+ * Generates a short conversation title from the user's first prompt.
+ * Runs as a fire-and-forget background task — updates the conversation
+ * title in the store and pushes an event to the renderer when done.
+ */
+export async function generateConversationTitle(
+  conversationId: string,
+  prompt: string,
+  window: BrowserWindow
+): Promise<void> {
+  const settings = await getSettings();
+  if (!settings.geminiApiKey) return;
+
+  const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: TITLE_MODEL,
+      contents: [
+        {
+          text: `Generate a short title (3-6 words) for an image-generation conversation that starts with this prompt. Return ONLY the title, no quotes, no explanation.\n\nPrompt: ${prompt}`,
+        },
+      ],
+    });
+
+    const title = response.text?.trim();
+    if (!title) return;
+
+    await updateConversationTitle(conversationId, title);
+
+    const event: TitleGeneratedEvent = { conversationId, title };
+    if (!window.isDestroyed()) {
+      window.webContents.send(IPC_CHANNELS.GEMINI_TITLE_GENERATED, event);
+    }
+  } catch (err) {
+    // Title generation is best-effort — don't propagate errors
+    console.error("Failed to generate conversation title:", err);
   }
 }
