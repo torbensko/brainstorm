@@ -9,12 +9,21 @@ import type {
 } from "@/shared/types";
 
 export function useGenerate() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: GenerateRequest) =>
       window.electronAPI.invoke(
         IPC_CHANNELS.GEMINI_GENERATE,
         request
       ) as Promise<string>,
+    onSuccess: (_messageId, request) => {
+      // The main process has already added user + assistant messages
+      // to the store by this point — refetch so the UI shows them
+      queryClient.invalidateQueries({
+        queryKey: ["conversation", request.conversationId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
   });
 }
 
