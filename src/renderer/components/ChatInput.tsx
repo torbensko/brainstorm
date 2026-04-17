@@ -6,7 +6,7 @@ import {
   DEFAULT_SETTINGS,
   type AttachedImage,
 } from "@/shared/types";
-import { useSettings } from "@/renderer/hooks/useSettings";
+import { useSettings, useUpdateSettings } from "@/renderer/hooks/useSettings";
 import { useImageModels } from "@/renderer/hooks/useGemini";
 
 interface ChatInputProps {
@@ -22,19 +22,29 @@ interface ChatInputProps {
 
 export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
   const { data: settings } = useSettings();
+  const updateSettings = useUpdateSettings();
   const { data: models, isLoading: modelsLoading } = useImageModels();
   const [prompt, setPrompt] = useState("");
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
-  const [model, setModel] = useState<string | null>(null);
-  const [imageSize, setImageSize] = useState<ImageSize | null>(null);
-  const [count, setCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const effectiveModel =
-    model ?? settings?.defaultModel ?? DEFAULT_SETTINGS.defaultModel;
-  const effectiveSize =
-    imageSize ?? settings?.defaultImageSize ?? ImageSize.MEDIUM;
-  const effectiveCount = count ?? settings?.defaultCount ?? 4;
+  const effectiveModel = settings?.defaultModel ?? DEFAULT_SETTINGS.defaultModel;
+  const effectiveSize = settings?.defaultImageSize ?? ImageSize.MEDIUM;
+  const effectiveCount = settings?.defaultCount ?? 4;
+
+  const handleModelChange = (value: string) => {
+    updateSettings.mutate({ defaultModel: value });
+  };
+
+  const handleSizeChange = (value: ImageSize) => {
+    updateSettings.mutate({ defaultImageSize: value });
+  };
+
+  const handleCountChange = (value: number) => {
+    if (value >= 1 && value <= 8) {
+      updateSettings.mutate({ defaultCount: value });
+    }
+  };
 
   const handleSubmit = () => {
     const trimmed = prompt.trim();
@@ -109,7 +119,7 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
       <div className="mb-3 flex flex-wrap gap-3">
         <select
           value={effectiveModel}
-          onChange={(e) => setModel(e.target.value)}
+          onChange={(e) => handleModelChange(e.target.value)}
           disabled={modelsLoading}
           className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
         >
@@ -128,7 +138,7 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
 
         <select
           value={effectiveSize}
-          onChange={(e) => setImageSize(e.target.value as ImageSize)}
+          onChange={(e) => handleSizeChange(e.target.value as ImageSize)}
           className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
         >
           {Object.entries(IMAGE_SIZE_LABELS).map(([value, label]) => (
@@ -145,7 +155,7 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
             min={1}
             max={8}
             value={effectiveCount}
-            onChange={(e) => setCount(parseInt(e.target.value, 10))}
+            onChange={(e) => handleCountChange(parseInt(e.target.value, 10))}
             className="w-14 rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
