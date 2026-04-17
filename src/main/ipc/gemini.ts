@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "@/shared/ipc-channels";
 import type { GenerateRequest } from "@/shared/types";
 import {
-  generateImages,
+  requestImages,
   cancelGeneration,
   listImageModels,
 } from "../services/GeminiService";
@@ -17,7 +17,7 @@ export function registerGeminiIpc(): void {
     async (event, request: GenerateRequest) => {
       const window = BrowserWindow.fromWebContents(event.sender);
       if (!window) throw new Error("No window found for event");
-      return generateImages(request, window);
+      return requestImages(request, window);
     }
   );
 
