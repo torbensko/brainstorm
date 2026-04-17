@@ -12,12 +12,14 @@ import {
 interface SidebarProps {
   readonly selectedId: string | null;
   readonly onSelect: (id: string) => void;
+  readonly onDelete: (id: string) => void;
   readonly onShowSettings: () => void;
 }
 
 export function Sidebar({
   selectedId,
   onSelect,
+  onDelete,
   onShowSettings,
 }: SidebarProps) {
   const { data: conversations = [] } = useConversationList();
@@ -47,6 +49,7 @@ export function Sidebar({
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     deleteConversation.mutate(id);
+    onDelete(id);
   };
 
   return (

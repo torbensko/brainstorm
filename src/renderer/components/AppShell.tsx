@@ -20,6 +20,11 @@ export function AppShell() {
             setSelectedConversation(id);
             setView({ kind: "chat" });
           }}
+          onDelete={(id) => {
+            if (selectedConversation === id) {
+              setSelectedConversation(null);
+            }
+          }}
           onShowSettings={() => setView({ kind: "settings" })}
         />
       )}
