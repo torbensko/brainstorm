@@ -5,16 +5,66 @@ export interface GeminiModelInfo {
   readonly supportedActions: readonly string[];
 }
 
-export enum ImageSize {
-  SMALL = "256x256",
-  MEDIUM = "512x512",
-  LARGE = "1024x1024",
+/**
+ * Known Nano Banana models that use generateContent with native image output.
+ * These are hardcoded because the models.list API doesn't reliably indicate
+ * which models support native image generation via generateContent.
+ */
+export const NANO_BANANA_MODELS: readonly GeminiModelInfo[] = [
+  {
+    id: "gemini-3.1-flash-image-preview",
+    displayName: "Nano Banana 2 (3.1 Flash Image)",
+    description: "Best all-around performance and speed",
+    supportedActions: ["generateContent"],
+  },
+  {
+    id: "gemini-3-pro-image-preview",
+    displayName: "Nano Banana Pro (3 Pro Image)",
+    description: "Professional asset production with thinking",
+    supportedActions: ["generateContent"],
+  },
+  {
+    id: "gemini-2.5-flash-image",
+    displayName: "Nano Banana (2.5 Flash Image)",
+    description: "High-volume, low-latency",
+    supportedActions: ["generateContent"],
+  },
+];
+
+export enum ImageResolution {
+  HALF_K = "512",
+  ONE_K = "1K",
+  TWO_K = "2K",
+  FOUR_K = "4K",
 }
 
-export const IMAGE_SIZE_LABELS: Record<ImageSize, string> = {
-  [ImageSize.SMALL]: "Small (256×256)",
-  [ImageSize.MEDIUM]: "Medium (512×512)",
-  [ImageSize.LARGE]: "Large (1024×1024)",
+export const IMAGE_RESOLUTION_LABELS: Record<ImageResolution, string> = {
+  [ImageResolution.HALF_K]: "0.5K (512)",
+  [ImageResolution.ONE_K]: "1K",
+  [ImageResolution.TWO_K]: "2K",
+  [ImageResolution.FOUR_K]: "4K",
+};
+
+export enum AspectRatio {
+  SQUARE = "1:1",
+  PORTRAIT_2_3 = "2:3",
+  LANDSCAPE_3_2 = "3:2",
+  PORTRAIT_3_4 = "3:4",
+  LANDSCAPE_4_3 = "4:3",
+  PORTRAIT_9_16 = "9:16",
+  LANDSCAPE_16_9 = "16:9",
+  ULTRAWIDE_21_9 = "21:9",
+}
+
+export const ASPECT_RATIO_LABELS: Record<AspectRatio, string> = {
+  [AspectRatio.SQUARE]: "1:1 Square",
+  [AspectRatio.PORTRAIT_2_3]: "2:3 Portrait",
+  [AspectRatio.LANDSCAPE_3_2]: "3:2 Landscape",
+  [AspectRatio.PORTRAIT_3_4]: "3:4 Portrait",
+  [AspectRatio.LANDSCAPE_4_3]: "4:3 Landscape",
+  [AspectRatio.PORTRAIT_9_16]: "9:16 Tall",
+  [AspectRatio.LANDSCAPE_16_9]: "16:9 Wide",
+  [AspectRatio.ULTRAWIDE_21_9]: "21:9 Ultrawide",
 };
 
 export interface AttachedImage {
@@ -28,7 +78,8 @@ export interface GenerateRequest {
   readonly prompt: string;
   readonly attachedImages: readonly AttachedImage[];
   readonly model: string;
-  readonly imageSize: ImageSize;
+  readonly aspectRatio: AspectRatio;
+  readonly imageResolution: ImageResolution;
   readonly count: number;
 }
 
@@ -64,7 +115,8 @@ export interface Message {
   readonly attachedImages: readonly AttachedImage[];
   readonly images: GeneratedImage[];
   readonly model: string;
-  readonly imageSize: ImageSize;
+  readonly aspectRatio: AspectRatio;
+  readonly imageResolution: ImageResolution;
   readonly requestedCount: number;
   readonly timestamp: string;
   readonly errors: string[];
@@ -89,13 +141,15 @@ export interface ConversationSummary {
 export interface AppSettings {
   geminiApiKey: string;
   defaultModel: string;
-  defaultImageSize: ImageSize;
+  defaultAspectRatio: AspectRatio;
+  defaultImageResolution: ImageResolution;
   defaultCount: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: "",
-  defaultModel: "gemini-2.0-flash-preview-image-generation",
-  defaultImageSize: ImageSize.MEDIUM,
+  defaultModel: "gemini-3.1-flash-image-preview",
+  defaultAspectRatio: AspectRatio.SQUARE,
+  defaultImageResolution: ImageResolution.ONE_K,
   defaultCount: 4,
 };

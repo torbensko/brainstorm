@@ -11,43 +11,14 @@ import type {
   GeminiModelInfo,
   Message,
 } from "@/shared/types";
+import { NANO_BANANA_MODELS } from "@/shared/types";
 import { getSettings } from "./SettingsService";
 import { addMessage, updateMessage } from "./ConversationService";
 
 const activeGenerations = new Map<string, AbortController>();
 
-export async function listImageModels(): Promise<GeminiModelInfo[]> {
-  const settings = await getSettings();
-  if (!settings.geminiApiKey) {
-    throw new Error(
-      "Gemini API key not configured. Please set it in Settings."
-    );
-  }
-
-  const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
-  const models: GeminiModelInfo[] = [];
-
-  const pager = await ai.models.list({
-    config: { pageSize: 100, queryBase: true },
-  });
-  for await (const model of pager) {
-    const actions = model.supportedActions ?? [];
-
-    // Only include models that explicitly support image generation
-    if (!actions.includes("generateImages")) continue;
-
-    const id = (model.name ?? "").replace(/^models\//, "");
-    models.push({
-      id,
-      displayName: model.displayName ?? id,
-      description: model.description ?? "",
-      supportedActions: actions,
-    });
-  }
-
-  models.sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-  return models;
+export function listImageModels(): GeminiModelInfo[] {
+  return [...NANO_BANANA_MODELS];
 }
 
 export async function requestImages(
@@ -75,7 +46,8 @@ export async function requestImages(
     attachedImages: request.attachedImages,
     images: [],
     model: request.model,
-    imageSize: request.imageSize,
+    aspectRatio: request.aspectRatio,
+    imageResolution: request.imageResolution,
     requestedCount: request.count,
     timestamp: new Date().toISOString(),
     errors: [],
@@ -91,7 +63,8 @@ export async function requestImages(
     attachedImages: [],
     images: [],
     model: request.model,
-    imageSize: request.imageSize,
+    aspectRatio: request.aspectRatio,
+    imageResolution: request.imageResolution,
     requestedCount: request.count,
     timestamp: new Date().toISOString(),
     errors: [],
@@ -99,7 +72,7 @@ export async function requestImages(
   };
   await addMessage(request.conversationId, assistantMessage);
 
-  // Fire N parallel requests
+  // Fire N parallel generateContent requests
   const promises = Array.from({ length: request.count }, (_, index) =>
     generateSingleImage(ai, request, messageId, index, window, abortController)
   );
@@ -126,6 +99,13 @@ export async function requestImages(
   return messageId;
 }
 
+/**
+ * Generates a single image using the Nano Banana generateContent API.
+ *
+ * Per the Gemini docs, these models return images via part.inlineData
+ * in the response candidates. The imageConfig controls aspect ratio
+ * and resolution.
+ */
 async function generateSingleImage(
   ai: GoogleGenAI,
   request: GenerateRequest,
@@ -137,42 +117,84 @@ async function generateSingleImage(
   if (abortController.signal.aborted) return;
 
   try {
-    const prompt = `${request.prompt}\n\nVariation ${index + 1} of ${request.count}: Please create a unique interpretation.`;
+    // Build content parts: attached images first, then prompt text
+    const parts: Array<
+      | { text: string }
+      | { inlineData: { data: string; mimeType: string } }
+    > = [];
 
-    const response = await ai.models.generateImages({
+    for (const img of request.attachedImages) {
+      parts.push({
+        inlineData: { data: img.data, mimeType: img.mimeType },
+      });
+    }
+
+    parts.push({
+      text:
+        request.count > 1
+          ? `${request.prompt}\n\nVariation ${index + 1} of ${request.count}: Please create a unique interpretation.`
+          : request.prompt,
+    });
+
+    const response = await ai.models.generateContent({
       model: request.model,
-      prompt,
+      contents: parts,
       config: {
-        numberOfImages: 1,
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: {
+          aspectRatio: request.aspectRatio,
+          imageSize: request.imageResolution,
+        },
       },
     });
 
     if (abortController.signal.aborted) return;
 
-    const generated = response.generatedImages;
-    if (!generated?.length) {
-      throw new Error("No images returned from API");
+    // Extract image from response parts
+    const candidates = response.candidates;
+    if (!candidates?.length) {
+      throw new Error("No candidates in Gemini response");
     }
 
-    const img = generated[0].image;
-    if (!img?.imageBytes) {
-      throw new Error("Image response contained no image data");
+    const responseParts = candidates[0].content?.parts;
+    if (!responseParts?.length) {
+      throw new Error("No parts in Gemini response");
+    }
+
+    // Find the last non-thought image part (final rendered image)
+    let imageData: string | null = null;
+    let mimeType = "image/png";
+
+    for (const part of responseParts) {
+      // Skip thought parts — they're interim images
+      if ((part as { thought?: boolean }).thought) continue;
+
+      if (part.inlineData?.data) {
+        imageData = part.inlineData.data;
+        mimeType = part.inlineData.mimeType ?? "image/png";
+      }
+    }
+
+    if (!imageData) {
+      const partKeys = responseParts.map((p) => Object.keys(p).join(","));
+      throw new Error(
+        `No image in response. Parts: [${partKeys.join(" | ")}]`
+      );
     }
 
     const generatedImage: GeneratedImage = {
       id: randomUUID(),
-      data: img.imageBytes,
-      mimeType: img.mimeType ?? "image/png",
+      data: imageData,
+      mimeType,
       index,
     };
 
-    // Persist image to message
+    // Persist and notify
     await updateMessage(request.conversationId, messageId, (msg) => ({
       ...msg,
       images: [...msg.images, generatedImage],
     }));
 
-    // Notify renderer
     const event: ImageResultEvent = {
       conversationId: request.conversationId,
       messageId,

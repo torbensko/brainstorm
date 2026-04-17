@@ -1,20 +1,24 @@
 import { useState, useRef } from "react";
 import { Send, ImagePlus, X, Loader2 } from "lucide-react";
 import {
-  ImageSize,
-  IMAGE_SIZE_LABELS,
+  AspectRatio,
+  ASPECT_RATIO_LABELS,
+  ImageResolution,
+  IMAGE_RESOLUTION_LABELS,
   DEFAULT_SETTINGS,
+  NANO_BANANA_MODELS,
   type AttachedImage,
+  type GeminiModelInfo,
 } from "@/shared/types";
 import { useSettings, useUpdateSettings } from "@/renderer/hooks/useSettings";
-import { useImageModels } from "@/renderer/hooks/useGemini";
 
 interface ChatInputProps {
   readonly onSubmit: (data: {
     prompt: string;
     attachedImages: AttachedImage[];
     model: string;
-    imageSize: ImageSize;
+    aspectRatio: AspectRatio;
+    imageResolution: ImageResolution;
     count: number;
   }) => void;
   readonly isGenerating: boolean;
@@ -23,21 +27,29 @@ interface ChatInputProps {
 export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
-  const { data: models, isLoading: modelsLoading } = useImageModels();
   const [prompt, setPrompt] = useState("");
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const effectiveModel = settings?.defaultModel ?? DEFAULT_SETTINGS.defaultModel;
-  const effectiveSize = settings?.defaultImageSize ?? ImageSize.MEDIUM;
+  const effectiveModel =
+    settings?.defaultModel ?? DEFAULT_SETTINGS.defaultModel;
+  const effectiveAspectRatio =
+    settings?.defaultAspectRatio ?? DEFAULT_SETTINGS.defaultAspectRatio;
+  const effectiveResolution =
+    settings?.defaultImageResolution ??
+    DEFAULT_SETTINGS.defaultImageResolution;
   const effectiveCount = settings?.defaultCount ?? 4;
 
   const handleModelChange = (value: string) => {
     updateSettings.mutate({ defaultModel: value });
   };
 
-  const handleSizeChange = (value: ImageSize) => {
-    updateSettings.mutate({ defaultImageSize: value });
+  const handleAspectRatioChange = (value: AspectRatio) => {
+    updateSettings.mutate({ defaultAspectRatio: value });
+  };
+
+  const handleResolutionChange = (value: ImageResolution) => {
+    updateSettings.mutate({ defaultImageResolution: value });
   };
 
   const handleCountChange = (value: number) => {
@@ -53,7 +65,8 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
       prompt: trimmed,
       attachedImages,
       model: effectiveModel,
-      imageSize: effectiveSize,
+      aspectRatio: effectiveAspectRatio,
+      imageResolution: effectiveResolution,
       count: effectiveCount,
     });
     setPrompt("");
@@ -120,28 +133,37 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
         <select
           value={effectiveModel}
           onChange={(e) => handleModelChange(e.target.value)}
-          disabled={modelsLoading}
-          className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+          className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
         >
-          {modelsLoading ? (
-            <option>Loading models...</option>
-          ) : models && models.length > 0 ? (
-            models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.displayName}
-              </option>
-            ))
-          ) : (
-            <option value={effectiveModel}>{effectiveModel}</option>
-          )}
+          {NANO_BANANA_MODELS.map((m: GeminiModelInfo) => (
+            <option key={m.id} value={m.id}>
+              {m.displayName}
+            </option>
+          ))}
         </select>
 
         <select
-          value={effectiveSize}
-          onChange={(e) => handleSizeChange(e.target.value as ImageSize)}
+          value={effectiveAspectRatio}
+          onChange={(e) =>
+            handleAspectRatioChange(e.target.value as AspectRatio)
+          }
           className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
         >
-          {Object.entries(IMAGE_SIZE_LABELS).map(([value, label]) => (
+          {Object.entries(ASPECT_RATIO_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={effectiveResolution}
+          onChange={(e) =>
+            handleResolutionChange(e.target.value as ImageResolution)
+          }
+          className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
+        >
+          {Object.entries(IMAGE_RESOLUTION_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>

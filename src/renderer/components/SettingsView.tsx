@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useSettings, useUpdateSettings } from "@/renderer/hooks/useSettings";
-import { useImageModels } from "@/renderer/hooks/useGemini";
-import { ImageSize, IMAGE_SIZE_LABELS, DEFAULT_SETTINGS } from "@/shared/types";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  AspectRatio,
+  ASPECT_RATIO_LABELS,
+  ImageResolution,
+  IMAGE_RESOLUTION_LABELS,
+  NANO_BANANA_MODELS,
+  DEFAULT_SETTINGS,
+  type GeminiModelInfo,
+} from "@/shared/types";
 
 interface SettingsViewProps {
   readonly onBack: () => void;
@@ -12,20 +18,24 @@ interface SettingsViewProps {
 export function SettingsView({ onBack }: SettingsViewProps) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
-  const { data: models, isLoading: modelsLoading, error: modelsError } = useImageModels();
-  const queryClient = useQueryClient();
 
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(DEFAULT_SETTINGS.defaultModel);
-  const [imageSize, setImageSize] = useState<ImageSize>(ImageSize.MEDIUM);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(
+    DEFAULT_SETTINGS.defaultAspectRatio
+  );
+  const [resolution, setResolution] = useState<ImageResolution>(
+    DEFAULT_SETTINGS.defaultImageResolution
+  );
   const [count, setCount] = useState(4);
 
   useEffect(() => {
     if (settings) {
       setApiKey(settings.geminiApiKey);
       setModel(settings.defaultModel);
-      setImageSize(settings.defaultImageSize);
+      setAspectRatio(settings.defaultAspectRatio);
+      setResolution(settings.defaultImageResolution);
       setCount(settings.defaultCount);
     }
   }, [settings]);
@@ -34,13 +44,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     updateSettings.mutate({
       geminiApiKey: apiKey,
       defaultModel: model,
-      defaultImageSize: imageSize,
+      defaultAspectRatio: aspectRatio,
+      defaultImageResolution: resolution,
       defaultCount: count,
     });
-  };
-
-  const handleRefreshModels = () => {
-    queryClient.invalidateQueries({ queryKey: ["gemini-models"] });
   };
 
   return (
@@ -87,64 +94,55 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
           {/* Default Model */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Default Model</label>
-              <button
-                onClick={handleRefreshModels}
-                disabled={modelsLoading}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-                title="Refresh model list from Google"
-              >
-                <RefreshCw
-                  className={`h-3 w-3 ${modelsLoading ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </button>
-            </div>
+            <label className="text-sm font-medium">Default Model</label>
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              disabled={modelsLoading}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-            >
-              {modelsLoading ? (
-                <option>Loading models...</option>
-              ) : models && models.length > 0 ? (
-                models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.displayName}
-                  </option>
-                ))
-              ) : (
-                <option value={model}>{model}</option>
-              )}
-            </select>
-            {modelsError && (
-              <p className="text-xs text-destructive">
-                Failed to load models. Save your API key first, then refresh.
-              </p>
-            )}
-            {models && models.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {models.length} image-capable model
-                {models.length !== 1 ? "s" : ""} available
-              </p>
-            )}
-          </div>
-
-          {/* Default Image Size */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Default Image Size</label>
-            <select
-              value={imageSize}
-              onChange={(e) => setImageSize(e.target.value as ImageSize)}
               className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             >
-              {Object.entries(IMAGE_SIZE_LABELS).map(([value, label]) => (
+              {NANO_BANANA_MODELS.map((m: GeminiModelInfo) => (
+                <option key={m.id} value={m.id}>
+                  {m.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Default Aspect Ratio */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Default Aspect Ratio</label>
+            <select
+              value={aspectRatio}
+              onChange={(e) =>
+                setAspectRatio(e.target.value as AspectRatio)
+              }
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              {Object.entries(ASPECT_RATIO_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Default Resolution */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Default Resolution</label>
+            <select
+              value={resolution}
+              onChange={(e) =>
+                setResolution(e.target.value as ImageResolution)
+              }
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              {Object.entries(IMAGE_RESOLUTION_LABELS).map(
+                ([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                )
+              )}
             </select>
           </div>
 

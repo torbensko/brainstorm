@@ -52,6 +52,7 @@ Documentation in this project is consumed by AI coding agents as much as by huma
 <!-- blint:patterns -->
 ## Patterns
 
-- When working on Electron main process entry, preload scripts, Vite configs for main/preload/renderer, IPC handler registrations, window creation helpers, React app root, and build configuration, read `.blint/patterns/electron-app-architecture.md`
-- When working on GitHub Actions workflow files for releasing the Electron app, Electron Forge config, UpdateService, update IPC handlers, update provider components, Squirrel lifecycle handling, and entitlements plists, read `.blint/patterns/electron-release-pipeline.md`
+- When working on React components that render async data, pages or views with loading/error states, and any component that calls useQuery or useMutation, read `.blint/patterns/a-general-purpose-async-loading-component-for-react-query.md`
+- When working on files matching `electron/**/*`, `src/main/**/*`, `src/renderer/**/*`, `src/shared/**/*`, `vite.*.config.mjs`, `forge.config.ts`, read `.blint/patterns/electron-app-architecture.md`
+- When working on files matching `.github/workflows/*`, `forge.config.ts`, `**/*.plist`, read `.blint/patterns/electron-release-pipeline.md`
 <!-- /blint:patterns -->

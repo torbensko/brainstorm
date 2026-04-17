@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import type { Message, AttachedImage } from "@/shared/types";
-import { ImageSize } from "@/shared/types";
+import { AspectRatio, ImageResolution } from "@/shared/types";
 import { useConversation } from "@/renderer/hooks/useConversations";
 import { useGenerate, useGeminiEvents } from "@/renderer/hooks/useGemini";
 import { ChatInput } from "./ChatInput";
@@ -22,15 +22,17 @@ export function ChatView({ conversationId }: ChatViewProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation?.messages]);
 
-  const isGenerating = conversation?.messages.some(
-    (m: Message) => m.role === "assistant" && !m.complete
-  ) ?? false;
+  const isGenerating =
+    conversation?.messages.some(
+      (m: Message) => m.role === "assistant" && !m.complete
+    ) ?? false;
 
   const handleSubmit = (data: {
     prompt: string;
     attachedImages: AttachedImage[];
     model: string;
-    imageSize: ImageSize;
+    aspectRatio: AspectRatio;
+    imageResolution: ImageResolution;
     count: number;
   }) => {
     generate.mutate({
@@ -70,7 +72,6 @@ export function ChatView({ conversationId }: ChatViewProps) {
               {message.role === "user" ? (
                 <div className="flex justify-end">
                   <div className="max-w-[80%] space-y-2">
-                    {/* Attached images */}
                     {message.attachedImages.length > 0 && (
                       <div className="flex flex-wrap justify-end gap-2">
                         {message.attachedImages.map(
