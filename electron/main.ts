@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import path from "path";
 import { registerGeminiIpc } from "@/main/ipc/gemini";
 import { registerSettingsIpc } from "@/main/ipc/settings";
@@ -42,6 +42,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle("app:get-version", () => app.getVersion());
+
   registerSettingsIpc();
   registerConversationsIpc();
   registerGeminiIpc();

@@ -6,7 +6,7 @@ export interface ElectronAPI {
     channel: string,
     callback: (...args: unknown[]) => void
   ): () => void;
-  getVersion(): string;
+  getVersion(): Promise<string>;
 }
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -22,5 +22,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
     };
   },
 
-  getVersion: () => process.env.npm_package_version ?? "0.0.0",
+  getVersion: () => ipcRenderer.invoke("app:get-version"),
 } satisfies ElectronAPI);
