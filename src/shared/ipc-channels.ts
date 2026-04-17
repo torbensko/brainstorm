@@ -6,6 +6,8 @@ export const IPC_CHANNELS = {
   GEMINI_GENERATION_ERROR: "gemini:generation-error",
   GEMINI_GENERATION_COMPLETE: "gemini:generation-complete",
 
+  GEMINI_LIST_MODELS: "gemini:list-models",
+
   // Settings
   SETTINGS_GET: "settings:get",
   SETTINGS_SET: "settings:set",

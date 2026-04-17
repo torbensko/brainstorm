@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useSettings, useUpdateSettings } from "@/renderer/hooks/useSettings";
-import {
-  GeminiModel,
-  GEMINI_MODEL_LABELS,
-  ImageSize,
-  IMAGE_SIZE_LABELS,
-} from "@/shared/types";
+import { useImageModels } from "@/renderer/hooks/useGemini";
+import { ImageSize, IMAGE_SIZE_LABELS, DEFAULT_SETTINGS } from "@/shared/types";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SettingsViewProps {
   readonly onBack: () => void;
@@ -15,10 +12,12 @@ interface SettingsViewProps {
 export function SettingsView({ onBack }: SettingsViewProps) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
+  const { data: models, isLoading: modelsLoading, error: modelsError } = useImageModels();
+  const queryClient = useQueryClient();
 
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [model, setModel] = useState<GeminiModel>(GeminiModel.GEMINI_2_FLASH);
+  const [model, setModel] = useState(DEFAULT_SETTINGS.defaultModel);
   const [imageSize, setImageSize] = useState<ImageSize>(ImageSize.MEDIUM);
   const [count, setCount] = useState(4);
 
@@ -38,6 +37,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       defaultImageSize: imageSize,
       defaultCount: count,
     });
+  };
+
+  const handleRefreshModels = () => {
+    queryClient.invalidateQueries({ queryKey: ["gemini-models"] });
   };
 
   return (
@@ -84,18 +87,49 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
           {/* Default Model */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Default Model</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Default Model</label>
+              <button
+                onClick={handleRefreshModels}
+                disabled={modelsLoading}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                title="Refresh model list from Google"
+              >
+                <RefreshCw
+                  className={`h-3 w-3 ${modelsLoading ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </button>
+            </div>
             <select
               value={model}
-              onChange={(e) => setModel(e.target.value as GeminiModel)}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              onChange={(e) => setModel(e.target.value)}
+              disabled={modelsLoading}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             >
-              {Object.entries(GEMINI_MODEL_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
+              {modelsLoading ? (
+                <option>Loading models...</option>
+              ) : models && models.length > 0 ? (
+                models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.displayName}
+                  </option>
+                ))
+              ) : (
+                <option value={model}>{model}</option>
+              )}
             </select>
+            {modelsError && (
+              <p className="text-xs text-destructive">
+                Failed to load models. Save your API key first, then refresh.
+              </p>
+            )}
+            {models && models.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {models.length} image-capable model
+                {models.length !== 1 ? "s" : ""} available
+              </p>
+            )}
           </div>
 
           {/* Default Image Size */}

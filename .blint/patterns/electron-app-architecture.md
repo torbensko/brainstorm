@@ -8,6 +8,14 @@ match: >-
   Electron main process entry, preload scripts, Vite configs for
   main/preload/renderer, IPC handler registrations, window creation helpers,
   React app root, and build configuration
+matchCriteria:
+  globs:
+    - "electron/**/*"
+    - "src/main/**/*"
+    - "src/renderer/**/*"
+    - "src/shared/**/*"
+    - "vite.*.config.mjs"
+    - "forge.config.ts"
 visibility: public
 registryId: electron-app-architecture
 registryVersion: 1

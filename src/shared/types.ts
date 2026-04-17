@@ -1,12 +1,9 @@
-export enum GeminiModel {
-  GEMINI_2_FLASH = "gemini-2.0-flash-preview-image-generation",
-  IMAGEN_3 = "imagen-3.0-generate-002",
+export interface GeminiModelInfo {
+  readonly id: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly supportedActions: readonly string[];
 }
-
-export const GEMINI_MODEL_LABELS: Record<GeminiModel, string> = {
-  [GeminiModel.GEMINI_2_FLASH]: "Gemini 2.0 Flash (Image Gen)",
-  [GeminiModel.IMAGEN_3]: "Imagen 3",
-};
 
 export enum ImageSize {
   SMALL = "256x256",
@@ -30,7 +27,7 @@ export interface GenerateRequest {
   readonly conversationId: string;
   readonly prompt: string;
   readonly attachedImages: readonly AttachedImage[];
-  readonly model: GeminiModel;
+  readonly model: string;
   readonly imageSize: ImageSize;
   readonly count: number;
 }
@@ -66,7 +63,7 @@ export interface Message {
   readonly prompt: string;
   readonly attachedImages: readonly AttachedImage[];
   readonly images: GeneratedImage[];
-  readonly model: GeminiModel;
+  readonly model: string;
   readonly imageSize: ImageSize;
   readonly requestedCount: number;
   readonly timestamp: string;
@@ -91,14 +88,14 @@ export interface ConversationSummary {
 
 export interface AppSettings {
   geminiApiKey: string;
-  defaultModel: GeminiModel;
+  defaultModel: string;
   defaultImageSize: ImageSize;
   defaultCount: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: "",
-  defaultModel: GeminiModel.GEMINI_2_FLASH,
+  defaultModel: "gemini-2.0-flash-preview-image-generation",
   defaultImageSize: ImageSize.MEDIUM,
   defaultCount: 4,
 };

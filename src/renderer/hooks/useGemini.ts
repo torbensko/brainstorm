@@ -1,12 +1,24 @@
 import { useEffect, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { IPC_CHANNELS } from "@/shared/ipc-channels";
 import type {
   GenerateRequest,
+  GeminiModelInfo,
   ImageResultEvent,
   GenerationErrorEvent,
   GenerationCompleteEvent,
 } from "@/shared/types";
+
+export function useImageModels() {
+  return useQuery<GeminiModelInfo[]>({
+    queryKey: ["gemini-models"],
+    queryFn: () =>
+      window.electronAPI.invoke(
+        IPC_CHANNELS.GEMINI_LIST_MODELS
+      ) as Promise<GeminiModelInfo[]>,
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+  });
+}
 
 export function useGenerate() {
   return useMutation({
@@ -75,14 +87,32 @@ export function useGeminiEvents(conversationId: string | null) {
 
 export function useSaveImage() {
   return useMutation({
-    mutationFn: (image: { data: string; mimeType: string; id: string; index: number }) =>
-      window.electronAPI.invoke(IPC_CHANNELS.IMAGE_SAVE, image) as Promise<string | null>,
+    mutationFn: (image: {
+      data: string;
+      mimeType: string;
+      id: string;
+      index: number;
+    }) =>
+      window.electronAPI.invoke(
+        IPC_CHANNELS.IMAGE_SAVE,
+        image
+      ) as Promise<string | null>,
   });
 }
 
 export function useSaveAllImages() {
   return useMutation({
-    mutationFn: (images: Array<{ data: string; mimeType: string; id: string; index: number }>) =>
-      window.electronAPI.invoke(IPC_CHANNELS.IMAGE_SAVE_ALL, images) as Promise<string | null>,
+    mutationFn: (
+      images: Array<{
+        data: string;
+        mimeType: string;
+        id: string;
+        index: number;
+      }>
+    ) =>
+      window.electronAPI.invoke(
+        IPC_CHANNELS.IMAGE_SAVE_ALL,
+        images
+      ) as Promise<string | null>,
   });
 }

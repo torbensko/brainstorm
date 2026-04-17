@@ -8,6 +8,15 @@ match: >-
   GitHub Actions workflow files for releasing the Electron app, Electron Forge
   config, UpdateService, update IPC handlers, update provider components,
   Squirrel lifecycle handling, and entitlements plists
+matchCriteria:
+  globs:
+    - ".github/workflows/*"
+    - "forge.config.ts"
+    - "**/*.plist"
+  contentMatch:
+    - "UpdateService"
+    - "electron-updater"
+    - "squirrel"
 visibility: public
 registryId: electron-release-pipeline
 registryVersion: 2

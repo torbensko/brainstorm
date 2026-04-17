@@ -1,19 +1,19 @@
 import { useState, useRef } from "react";
-import { Send, ImagePlus, X } from "lucide-react";
+import { Send, ImagePlus, X, Loader2 } from "lucide-react";
 import {
-  GeminiModel,
-  GEMINI_MODEL_LABELS,
   ImageSize,
   IMAGE_SIZE_LABELS,
+  DEFAULT_SETTINGS,
   type AttachedImage,
 } from "@/shared/types";
 import { useSettings } from "@/renderer/hooks/useSettings";
+import { useImageModels } from "@/renderer/hooks/useGemini";
 
 interface ChatInputProps {
   readonly onSubmit: (data: {
     prompt: string;
     attachedImages: AttachedImage[];
-    model: GeminiModel;
+    model: string;
     imageSize: ImageSize;
     count: number;
   }) => void;
@@ -22,15 +22,18 @@ interface ChatInputProps {
 
 export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
   const { data: settings } = useSettings();
+  const { data: models, isLoading: modelsLoading } = useImageModels();
   const [prompt, setPrompt] = useState("");
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
-  const [model, setModel] = useState<GeminiModel | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState<ImageSize | null>(null);
   const [count, setCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const effectiveModel = model ?? settings?.defaultModel ?? GeminiModel.GEMINI_2_FLASH;
-  const effectiveSize = imageSize ?? settings?.defaultImageSize ?? ImageSize.MEDIUM;
+  const effectiveModel =
+    model ?? settings?.defaultModel ?? DEFAULT_SETTINGS.defaultModel;
+  const effectiveSize =
+    imageSize ?? settings?.defaultImageSize ?? ImageSize.MEDIUM;
   const effectiveCount = count ?? settings?.defaultCount ?? 4;
 
   const handleSubmit = () => {
@@ -106,14 +109,21 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
       <div className="mb-3 flex flex-wrap gap-3">
         <select
           value={effectiveModel}
-          onChange={(e) => setModel(e.target.value as GeminiModel)}
-          className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
+          onChange={(e) => setModel(e.target.value)}
+          disabled={modelsLoading}
+          className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
         >
-          {Object.entries(GEMINI_MODEL_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+          {modelsLoading ? (
+            <option>Loading models...</option>
+          ) : models && models.length > 0 ? (
+            models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.displayName}
+              </option>
+            ))
+          ) : (
+            <option value={effectiveModel}>{effectiveModel}</option>
+          )}
         </select>
 
         <select
@@ -174,7 +184,11 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
           className="shrink-0 rounded-md bg-primary p-2 text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           title="Generate images"
         >
-          <Send className="h-5 w-5" />
+          {isGenerating ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <Send className="h-5 w-5" />
+          )}
         </button>
       </div>
     </div>

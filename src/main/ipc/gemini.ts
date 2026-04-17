@@ -1,9 +1,17 @@
 import { ipcMain, BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "@/shared/ipc-channels";
 import type { GenerateRequest } from "@/shared/types";
-import { generateImages, cancelGeneration } from "../services/GeminiService";
+import {
+  generateImages,
+  cancelGeneration,
+  listImageModels,
+} from "../services/GeminiService";
 
 export function registerGeminiIpc(): void {
+  ipcMain.handle(IPC_CHANNELS.GEMINI_LIST_MODELS, async () => {
+    return listImageModels();
+  });
+
   ipcMain.handle(
     IPC_CHANNELS.GEMINI_GENERATE,
     async (event, request: GenerateRequest) => {

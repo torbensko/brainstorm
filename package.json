@@ -4,15 +4,15 @@
   "description": "Gemini batch image generation desktop app",
   "main": ".vite/build/main.js",
   "scripts": {
-    "start": "NODE_INSTALLER=npm electron-forge start",
-    "package": "NODE_INSTALLER=npm electron-forge package",
-    "make": "NODE_INSTALLER=npm electron-forge make"
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "packageManager": "npm@11.11.0",
+  "packageManager": "yarn@4.14.1",
   "dependencies": {
     "@google/genai": "^1.50.1",
     "@radix-ui/react-dialog": "^1.1.15",

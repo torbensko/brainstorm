@@ -8,13 +8,59 @@ import type {
   ImageResultEvent,
   GenerationErrorEvent,
   GenerationCompleteEvent,
+  GeminiModelInfo,
   Message,
 } from "@/shared/types";
-import { GeminiModel } from "@/shared/types";
 import { getSettings } from "./SettingsService";
 import { addMessage, updateMessage } from "./ConversationService";
 
 const activeGenerations = new Map<string, AbortController>();
+
+/**
+ * Models whose supportedActions include "generateContent" can produce
+ * images when called with responseModalities: ["IMAGE"]. We also include
+ * models that explicitly list "generateImages" (e.g. Imagen).
+ */
+const IMAGE_CAPABLE_ACTIONS = new Set(["generateContent", "generateImages"]);
+
+export async function listImageModels(): Promise<GeminiModelInfo[]> {
+  const settings = await getSettings();
+  if (!settings.geminiApiKey) {
+    throw new Error(
+      "Gemini API key not configured. Please set it in Settings."
+    );
+  }
+
+  const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
+  const models: GeminiModelInfo[] = [];
+
+  const pager = await ai.models.list({ config: { pageSize: 100, queryBase: true } });
+  for await (const model of pager) {
+    const actions = model.supportedActions ?? [];
+    const hasImageAction = actions.some((a) => IMAGE_CAPABLE_ACTIONS.has(a));
+    if (!hasImageAction) continue;
+
+    // Strip the "models/" prefix that the API returns
+    const id = (model.name ?? "").replace(/^models\//, "");
+    models.push({
+      id,
+      displayName: model.displayName ?? id,
+      description: model.description ?? "",
+      supportedActions: actions,
+    });
+  }
+
+  // Sort so that models with "generateImages" (dedicated image models) come
+  // first, then alphabetically by display name.
+  models.sort((a, b) => {
+    const aImg = a.supportedActions.includes("generateImages") ? 0 : 1;
+    const bImg = b.supportedActions.includes("generateImages") ? 0 : 1;
+    if (aImg !== bImg) return aImg - bImg;
+    return a.displayName.localeCompare(b.displayName);
+  });
+
+  return models;
+}
 
 export async function generateImages(
   request: GenerateRequest,
@@ -22,7 +68,9 @@ export async function generateImages(
 ): Promise<string> {
   const settings = await getSettings();
   if (!settings.geminiApiKey) {
-    throw new Error("Gemini API key not configured. Please set it in Settings.");
+    throw new Error(
+      "Gemini API key not configured. Please set it in Settings."
+    );
   }
 
   const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
@@ -65,7 +113,14 @@ export async function generateImages(
 
   // Fire N parallel requests
   const promises = Array.from({ length: request.count }, (_, index) =>
-    generateSingleImage(ai, request, messageId, index, window, abortController)
+    generateSingleImage(
+      ai,
+      request,
+      messageId,
+      index,
+      window,
+      abortController
+    )
   );
 
   // Wait for all to settle, then mark complete
@@ -122,12 +177,9 @@ async function generateSingleImage(
     const response = await ai.models.generateContent({
       model: request.model,
       contents: [{ role: "user", parts: contents }],
-      config:
-        request.model === GeminiModel.GEMINI_2_FLASH
-          ? {
-              responseModalities: ["TEXT", "IMAGE"],
-            }
-          : undefined,
+      config: {
+        responseModalities: ["TEXT", "IMAGE"],
+      },
     });
 
     if (abortController.signal.aborted) return;

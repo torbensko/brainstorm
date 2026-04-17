@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import type { Message, AttachedImage } from "@/shared/types";
-import { GeminiModel, ImageSize } from "@/shared/types";
+import { ImageSize } from "@/shared/types";
 import { useConversation } from "@/renderer/hooks/useConversations";
 import { useGenerate, useGeminiEvents } from "@/renderer/hooks/useGemini";
 import { ChatInput } from "./ChatInput";
@@ -29,7 +29,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const handleSubmit = (data: {
     prompt: string;
     attachedImages: AttachedImage[];
-    model: GeminiModel;
+    model: string;
     imageSize: ImageSize;
     count: number;
   }) => {
