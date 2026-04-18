@@ -22,9 +22,16 @@ interface ChatInputProps {
     count: number;
   }) => void;
   readonly isGenerating: boolean;
+  readonly contextImages?: readonly AttachedImage[];
+  readonly onRemoveContextImage?: (index: number) => void;
 }
 
-export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
+export function ChatInput({
+  onSubmit,
+  isGenerating,
+  contextImages,
+  onRemoveContextImage,
+}: ChatInputProps) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
   const [prompt, setPrompt] = useState("");
@@ -107,6 +114,34 @@ export function ChatInput({ onSubmit, isGenerating }: ChatInputProps) {
 
   return (
     <div className="border-t bg-background p-4">
+      {/* Context images from conversation */}
+      {contextImages && contextImages.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+            Context from conversation
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {contextImages.map((img, i) => (
+              <div key={i} className="group relative">
+                <img
+                  src={`data:${img.mimeType};base64,${img.data}`}
+                  alt={img.name}
+                  className="h-16 w-16 rounded-md border-2 border-primary object-cover"
+                />
+                {onRemoveContextImage && (
+                  <button
+                    onClick={() => onRemoveContextImage(i)}
+                    className="absolute -right-1 -top-1 rounded-full bg-destructive p-0.5 text-destructive-foreground shadow"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Attached images preview */}
       {attachedImages.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">

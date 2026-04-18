@@ -1,4 +1,4 @@
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import type { GeneratedImage, Message } from "@/shared/types";
 import { ImageCard } from "./ImageCard";
 import { useSaveAllImages } from "@/renderer/hooks/useGemini";
@@ -6,9 +6,18 @@ import { useSaveAllImages } from "@/renderer/hooks/useGemini";
 interface ImageGridProps {
   readonly message: Message;
   readonly allImages: readonly GeneratedImage[];
+  readonly onSelectAsContext?: (image: GeneratedImage) => void;
+  readonly contextSelectionDisabled?: boolean;
+  readonly onGenerateMore?: () => void;
 }
 
-export function ImageGrid({ message, allImages }: ImageGridProps) {
+export function ImageGrid({
+  message,
+  allImages,
+  onSelectAsContext,
+  contextSelectionDisabled,
+  onGenerateMore,
+}: ImageGridProps) {
   const saveAll = useSaveAllImages();
   const pendingCount = message.requestedCount - message.images.length - message.errors.length;
   const showPending = !message.complete && pendingCount > 0;
@@ -20,7 +29,13 @@ export function ImageGrid({ message, allImages }: ImageGridProps) {
           .slice()
           .sort((a, b) => a.index - b.index)
           .map((image: GeneratedImage) => (
-            <ImageCard key={image.id} image={image} allImages={allImages} />
+            <ImageCard
+              key={image.id}
+              image={image}
+              allImages={allImages}
+              onSelectAsContext={onSelectAsContext}
+              contextSelectionDisabled={contextSelectionDisabled}
+            />
           ))}
         {showPending &&
           Array.from({ length: pendingCount }).map((_, i) => (
@@ -43,15 +58,28 @@ export function ImageGrid({ message, allImages }: ImageGridProps) {
         </div>
       )}
 
-      {message.images.length > 1 && message.complete && (
-        <button
-          onClick={() => saveAll.mutate([...message.images])}
-          disabled={saveAll.isPending}
-          className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-        >
-          <Download className="h-4 w-4" />
-          {saveAll.isPending ? "Saving..." : "Save All Images"}
-        </button>
+      {message.complete && (
+        <div className="flex gap-2">
+          {message.images.length > 1 && (
+            <button
+              onClick={() => saveAll.mutate([...message.images])}
+              disabled={saveAll.isPending}
+              className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              {saveAll.isPending ? "Saving..." : "Save All Images"}
+            </button>
+          )}
+          {onGenerateMore && (
+            <button
+              onClick={onGenerateMore}
+              className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Generate More
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

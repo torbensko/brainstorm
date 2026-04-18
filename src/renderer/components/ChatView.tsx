@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import type { Message, AttachedImage, GeneratedImage } from "@/shared/types";
+import type {
+  Message,
+  AttachedImage,
+  GeneratedImage,
+} from "@/shared/types";
 import { AspectRatio, ImageResolution } from "@/shared/types";
 import { useConversation } from "@/renderer/hooks/useConversations";
 import { useGenerate, useGeminiEvents } from "@/renderer/hooks/useGemini";
@@ -15,8 +19,14 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const { data: conversation, isLoading } = useConversation(conversationId);
   const generate = useGenerate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [contextImages, setContextImages] = useState<AttachedImage[]>([]);
 
   useGeminiEvents(conversationId);
+
+  // Clear context images when switching conversations
+  useEffect(() => {
+    setContextImages([]);
+  }, [conversationId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,7 +36,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
     () =>
       conversation?.messages.flatMap((m: Message) =>
         m.role === "assistant"
-          ? m.images.slice().sort((a: GeneratedImage, b: GeneratedImage) => a.index - b.index)
+          ? m.images
+              .slice()
+              .sort(
+                (a: GeneratedImage, b: GeneratedImage) => a.index - b.index,
+              )
           : [],
       ) ?? [],
     [conversation?.messages],
@@ -34,8 +48,23 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   const isGenerating =
     conversation?.messages.some(
-      (m: Message) => m.role === "assistant" && !m.complete
+      (m: Message) => m.role === "assistant" && !m.complete,
     ) ?? false;
+
+  const contextSelectionDisabled = contextImages.length > 0;
+
+  const handleSelectAsContext = useCallback((image: GeneratedImage) => {
+    const asAttached: AttachedImage = {
+      data: image.data,
+      mimeType: image.mimeType,
+      name: `Generated image ${image.index + 1}`,
+    };
+    setContextImages((prev) => [...prev, asAttached]);
+  }, []);
+
+  const handleRemoveContextImage = useCallback((index: number) => {
+    setContextImages((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleSubmit = (data: {
     prompt: string;
@@ -45,11 +74,42 @@ export function ChatView({ conversationId }: ChatViewProps) {
     imageResolution: ImageResolution;
     count: number;
   }) => {
+    // Merge context images into attached images for the request
+    const mergedAttachedImages = [...contextImages, ...data.attachedImages];
     generate.mutate({
       conversationId,
       ...data,
+      attachedImages: mergedAttachedImages,
     });
+    setContextImages([]);
   };
+
+  const handleGenerateMore = useCallback(
+    (assistantMessage: Message) => {
+      if (!conversation || isGenerating) return;
+
+      // Find the user message that preceded this assistant message
+      const messages = conversation.messages;
+      const assistantIndex = messages.findIndex(
+        (m) => m.id === assistantMessage.id,
+      );
+      if (assistantIndex <= 0) return;
+
+      const userMessage = messages[assistantIndex - 1];
+      if (userMessage.role !== "user") return;
+
+      generate.mutate({
+        conversationId,
+        prompt: userMessage.prompt,
+        attachedImages: [...userMessage.attachedImages],
+        model: userMessage.model,
+        aspectRatio: userMessage.aspectRatio,
+        imageResolution: userMessage.imageResolution,
+        count: userMessage.requestedCount,
+      });
+    },
+    [conversation, conversationId, generate, isGenerating],
+  );
 
   if (isLoading) {
     return (
@@ -92,7 +152,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
                               alt={img.name}
                               className="h-20 w-20 rounded-md border object-cover"
                             />
-                          )
+                          ),
                         )}
                       </div>
                     )}
@@ -106,7 +166,17 @@ export function ChatView({ conversationId }: ChatViewProps) {
               ) : (
                 <div className="flex justify-start">
                   <div className="max-w-[90%]">
-                    <ImageGrid message={message} allImages={allImages} />
+                    <ImageGrid
+                      message={message}
+                      allImages={allImages}
+                      onSelectAsContext={handleSelectAsContext}
+                      contextSelectionDisabled={contextSelectionDisabled}
+                      onGenerateMore={
+                        !isGenerating
+                          ? () => handleGenerateMore(message)
+                          : undefined
+                      }
+                    />
                   </div>
                 </div>
               )}
@@ -117,7 +187,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
       </div>
 
       {/* Input area */}
-      <ChatInput onSubmit={handleSubmit} isGenerating={isGenerating} />
+      <ChatInput
+        onSubmit={handleSubmit}
+        isGenerating={isGenerating}
+        contextImages={contextImages}
+        onRemoveContextImage={handleRemoveContextImage}
+      />
     </div>
   );
 }

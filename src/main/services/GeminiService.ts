@@ -14,7 +14,12 @@ import type {
 } from "@/shared/types";
 import { NANO_BANANA_MODELS } from "@/shared/types";
 import { getSettings } from "./SettingsService";
-import { addMessage, updateMessage, updateConversationTitle } from "./ConversationService";
+import {
+  addMessage,
+  updateMessage,
+  updateConversationTitle,
+  getConversation,
+} from "./ConversationService";
 
 const activeGenerations = new Map<string, AbortController>();
 
@@ -100,12 +105,92 @@ export async function requestImages(
   return messageId;
 }
 
+type ContentPart =
+  | { text: string }
+  | { inlineData: { data: string; mimeType: string } };
+
+interface Content {
+  role: "user" | "model";
+  parts: ContentPart[];
+}
+
+/**
+ * Builds a multi-turn contents array from conversation history.
+ *
+ * Walks all messages *before* the current request's user+assistant pair
+ * (which are the last two messages). User messages become user turns with
+ * their prompt and attached images. Assistant messages become model turns,
+ * but only include a generated image if the user explicitly selected it
+ * as context (it would appear as an attachedImage on a subsequent user message).
+ */
+async function buildMultiTurnContents(
+  conversationId: string,
+  request: GenerateRequest,
+  variationSuffix: string,
+): Promise<Content[]> {
+  const conversation = await getConversation(conversationId);
+  if (!conversation) throw new Error("Conversation not found");
+
+  const contents: Content[] = [];
+
+  // The last two messages are the just-created user + assistant placeholders
+  // for the current request — exclude them from history
+  const priorMessages = conversation.messages.slice(0, -2);
+
+  for (const msg of priorMessages) {
+    if (msg.role === "user") {
+      const parts: ContentPart[] = [];
+      for (const img of msg.attachedImages) {
+        parts.push({
+          inlineData: { data: img.data, mimeType: img.mimeType },
+        });
+      }
+      if (msg.prompt) {
+        parts.push({ text: msg.prompt });
+      }
+      if (parts.length > 0) {
+        contents.push({ role: "user", parts });
+      }
+    } else if (msg.role === "assistant" && msg.images.length > 0) {
+      // Include the first generated image as the model's response so
+      // Gemini knows what it produced. Only one image to control token usage.
+      const firstImage = msg.images[0];
+      contents.push({
+        role: "model",
+        parts: [
+          {
+            inlineData: {
+              data: firstImage.data,
+              mimeType: firstImage.mimeType,
+            },
+          },
+        ],
+      });
+    }
+  }
+
+  // Current user turn
+  const currentParts: ContentPart[] = [];
+  for (const img of request.attachedImages) {
+    currentParts.push({
+      inlineData: { data: img.data, mimeType: img.mimeType },
+    });
+  }
+  currentParts.push({ text: request.prompt + variationSuffix });
+  contents.push({ role: "user", parts: currentParts });
+
+  return contents;
+}
+
 /**
  * Generates a single image using the Nano Banana generateContent API.
  *
  * Per the Gemini docs, these models return images via part.inlineData
  * in the response candidates. The imageConfig controls aspect ratio
  * and resolution.
+ *
+ * Sends the full conversation history as multi-turn contents so Gemini
+ * can maintain context across follow-up messages.
  */
 async function generateSingleImage(
   ai: GoogleGenAI,
@@ -118,28 +203,20 @@ async function generateSingleImage(
   if (abortController.signal.aborted) return;
 
   try {
-    // Build content parts: attached images first, then prompt text
-    const parts: Array<
-      | { text: string }
-      | { inlineData: { data: string; mimeType: string } }
-    > = [];
+    const variationSuffix =
+      request.count > 1
+        ? `\n\nVariation ${index + 1} of ${request.count}: Please create a unique interpretation.`
+        : "";
 
-    for (const img of request.attachedImages) {
-      parts.push({
-        inlineData: { data: img.data, mimeType: img.mimeType },
-      });
-    }
-
-    parts.push({
-      text:
-        request.count > 1
-          ? `${request.prompt}\n\nVariation ${index + 1} of ${request.count}: Please create a unique interpretation.`
-          : request.prompt,
-    });
+    const contents = await buildMultiTurnContents(
+      request.conversationId,
+      request,
+      variationSuffix,
+    );
 
     const response = await ai.models.generateContent({
       model: request.model,
-      contents: parts,
+      contents,
       config: {
         responseModalities: ["TEXT", "IMAGE"],
         imageConfig: {
