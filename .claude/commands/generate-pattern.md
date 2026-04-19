@@ -1,15 +1,23 @@
-<!-- blint-managed v1 -->
-Generate a Blint pattern by examining existing code in the codebase: $ARGUMENTS
+<!-- blint-managed v3 -->
+Generate or refine a Blint pattern: $ARGUMENTS
 
 ## Instructions
 
-1. Read the user's description above to understand what codebase convention or practice they want captured as a pattern.
+**Determine the mode** based on `$ARGUMENTS`:
 
-2. Explore the relevant code thoroughly — read the key files, trace the implementation, understand the approach, conventions, and design decisions actually in use. Look at multiple examples if they exist to identify the consistent parts vs incidental details.
+- If `$ARGUMENTS` starts with `--refine` followed by a file path, read that pattern file. If the file body is empty (only frontmatter or blank), treat it as a **new pattern** — use the filename and any frontmatter `name` field as context for what the user wants to capture. If the file has content, treat it as **refining an existing pattern**.
+- If `$ARGUMENTS` is empty, ask the user what codebase convention they want captured. Wait for their response before proceeding.
+- Otherwise, treat `$ARGUMENTS` as the user's description of the convention to capture.
+
+## New pattern (empty file or description provided)
+
+1. Ask the user to describe the codebase convention or practice they want captured. Use the file's `name` frontmatter (if present) as a starting point — e.g. "I see this pattern is called 'Error Handling Convention'. Can you describe what this convention looks like in your codebase?" Wait for their response.
+
+2. Once you understand the convention, explore the relevant code thoroughly — read the key files, trace the implementation, understand the approach, conventions, and design decisions actually in use. Look at multiple examples if they exist to identify the consistent parts vs incidental details.
 
 3. Identify the **category** that best fits this pattern from the project's `activeCategories` in `.blint/project.json`. Use the `group:name` format (e.g. `quality:ci-cd`, `ops:environment`).
 
-4. Create a pattern file in `.blint/patterns/`. The filename should be kebab-case matching the pattern name (e.g. `github-actions-build.md`). The file should be markdown with YAML frontmatter:
+4. Write the pattern content **into the file specified by `--refine`** (or create a new file in `.blint/patterns/` if no file was specified). Update the YAML frontmatter:
 
 ```yaml
 ---
@@ -37,4 +45,11 @@ matchCriteria:
    - **No hardcoded values.** Don't embed specific versions, URLs, or thresholds that will change. Describe the concept instead.
    - **Keep it concise.** Every sentence should earn its place. This is consumed by AI coding agents as well as humans.
 
-6. After creating the pattern, show the user the file path and a brief summary of the key rules captured.
+6. After writing the pattern, show the user a brief summary of the key rules captured.
+
+## Refining an existing pattern (file has content)
+
+1. Read the pattern file and present a brief summary of the current pattern (name, description, key rules) to the user.
+2. Ask the user what they want to change — new rules, rewording, scope changes, etc.
+3. Update the pattern file in place. Increment the `version` number in frontmatter. Preserve all other frontmatter fields unless the user explicitly asks to change them.
+4. Show the user what changed.

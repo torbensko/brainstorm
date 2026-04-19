@@ -1,5 +1,5 @@
 {
-  "projectName": "brainstorm",
+  "projectName": "Brainstorm",
   "projectLanguage": "other",
   "projectType": "fullstack",
   "activeCategories": [
@@ -106,5 +106,7 @@
   "specsDirectory": "specs",
   "patternsDirectory": ".blint/patterns",
   "docsDirectory": "docs",
-  "headerColor": "#475569"
+  "headerColor": "#db2777",
+  "setupComplete": true,
+  "branchPrefix": "spec"
 }

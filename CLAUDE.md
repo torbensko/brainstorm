@@ -52,7 +52,7 @@ Documentation in this project is consumed by AI coding agents as much as by huma
 <!-- blint:patterns -->
 ## Patterns
 
-- When working on React components that render async data, pages or views with loading/error states, and any component that calls useQuery or useMutation, read `.blint/patterns/a-general-purpose-async-loading-component-for-react-query.md`
+- When working on files matching `src/renderer/**/*.tsx`, read `.blint/patterns/a-general-purpose-async-loading-component-for-react-query.md`
 - When working on files matching `electron/**/*`, `src/main/**/*`, `src/renderer/**/*`, `src/shared/**/*`, `vite.*.config.mjs`, `forge.config.ts`, read `.blint/patterns/electron-app-architecture.md`
 - When working on files matching `.github/workflows/*`, `forge.config.ts`, `**/*.plist`, read `.blint/patterns/electron-release-pipeline.md`
 <!-- /blint:patterns -->
