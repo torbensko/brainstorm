@@ -121,16 +121,18 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Draggable top region for window controls */}
+      <div className="app-draggable h-10 shrink-0" />
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
         {conversation?.messages.length === 0 && (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <h2 className="mb-2 text-lg font-medium text-muted-foreground">
+              <h2 className="display-heading text-4xl leading-tight">
                 Start brainstorming
               </h2>
-              <p className="text-sm text-muted-foreground">
-                Enter a prompt below to generate multiple image variations
+              <p className="mt-3 text-sm text-muted-foreground">
+                Enter a prompt below to generate image variations
               </p>
             </div>
           </div>

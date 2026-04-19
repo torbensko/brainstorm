@@ -53,14 +53,14 @@ export function AppShell() {
           <NewConversationView onCreated={handleConversationCreated} />
         ) : (
           <div className="flex h-full flex-col">
-            <div className="app-draggable h-12 border-b" />
-            <div className="flex flex-1 items-center justify-center">
+            <div className="app-draggable h-12 shrink-0" />
+            <div className="flex flex-1 items-center justify-center px-4">
               <div className="text-center">
-                <h2 className="mb-2 text-2xl font-semibold">
+                <h2 className="display-heading mb-3 text-5xl leading-tight">
                   Welcome to Brainstorm
                 </h2>
-                <p className="text-muted-foreground">
-                  Create a new conversation to start generating images
+                <p className="text-base text-muted-foreground">
+                  Start a new chat to generate image variations
                 </p>
               </div>
             </div>

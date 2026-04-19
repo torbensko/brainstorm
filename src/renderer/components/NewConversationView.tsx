@@ -21,21 +21,17 @@ export function NewConversationView({ onCreated }: NewConversationViewProps) {
     imageResolution: ImageResolution;
     count: number;
   }) => {
-    // 1. Create the conversation
     const conversation = await createConversation.mutateAsync(
       "New Conversation"
     );
 
-    // 2. Navigate to it immediately
     onCreated(conversation.id);
 
-    // 3. Start image generation
     generate.mutate({
       conversationId: conversation.id,
       ...data,
     });
 
-    // 4. Fire-and-forget title generation
     generateTitle.mutate({
       conversationId: conversation.id,
       prompt: data.prompt,
@@ -44,17 +40,14 @@ export function NewConversationView({ onCreated }: NewConversationViewProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="app-draggable h-12 border-b" />
-      <div className="flex flex-1 items-center justify-center px-4">
-        <div className="w-full max-w-2xl">
-          <div className="mb-6 text-center">
-            <h2 className="mb-2 text-2xl font-semibold">
-              Start a new conversation
-            </h2>
-            <p className="text-muted-foreground">
-              Describe the image you want to generate
-            </p>
-          </div>
+      <div className="app-draggable h-12 shrink-0" />
+      <div className="flex flex-1 flex-col items-center justify-center px-4">
+        <div className="mb-8 text-center">
+          <h2 className="display-heading text-5xl leading-tight">
+            Where should we start?
+          </h2>
+        </div>
+        <div className="w-full max-w-3xl">
           <ChatInput onSubmit={handleSubmit} isGenerating={false} />
         </div>
       </div>

@@ -66,10 +66,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="app-draggable flex h-12 items-center gap-3 border-b pl-20 pr-4">
+      <div className="app-draggable flex h-12 items-center gap-3 pl-20 pr-4">
         <button
           onClick={onBack}
-          className="app-no-drag rounded-md p-1 text-muted-foreground hover:text-foreground"
+          className="app-no-drag rounded-full p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
