@@ -48,7 +48,11 @@ export function NewConversationView({ onCreated }: NewConversationViewProps) {
           </h2>
         </div>
         <div className="w-full max-w-3xl">
-          <ChatInput onSubmit={handleSubmit} isGenerating={false} />
+          <ChatInput
+            onSubmit={handleSubmit}
+            isGenerating={false}
+            acceptDropAnywhere
+          />
         </div>
       </div>
     </div>

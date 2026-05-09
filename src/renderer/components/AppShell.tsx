@@ -11,18 +11,6 @@ export function AppShell() {
     string | null
   >(null);
   const [view, setView] = useState<View>({ kind: "chat" });
-  const [drafting, setDrafting] = useState(false);
-
-  const handleNewConversation = () => {
-    setSelectedConversation(null);
-    setDrafting(true);
-    setView({ kind: "chat" });
-  };
-
-  const handleConversationCreated = (id: string) => {
-    setSelectedConversation(id);
-    setDrafting(false);
-  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -31,10 +19,12 @@ export function AppShell() {
           selectedId={selectedConversation}
           onSelect={(id) => {
             setSelectedConversation(id);
-            setDrafting(false);
             setView({ kind: "chat" });
           }}
-          onNew={handleNewConversation}
+          onNew={() => {
+            setSelectedConversation(null);
+            setView({ kind: "chat" });
+          }}
           onDelete={(id) => {
             if (selectedConversation === id) {
               setSelectedConversation(null);
@@ -49,22 +39,8 @@ export function AppShell() {
           <SettingsView onBack={() => setView({ kind: "chat" })} />
         ) : selectedConversation ? (
           <ChatView conversationId={selectedConversation} />
-        ) : drafting ? (
-          <NewConversationView onCreated={handleConversationCreated} />
         ) : (
-          <div className="flex h-full flex-col">
-            <div className="app-draggable h-12 shrink-0" />
-            <div className="flex flex-1 items-center justify-center px-4">
-              <div className="text-center">
-                <h2 className="display-heading mb-3 text-5xl leading-tight">
-                  Welcome to Brainstorm
-                </h2>
-                <p className="text-base text-muted-foreground">
-                  Start a new chat to generate image variations
-                </p>
-              </div>
-            </div>
-          </div>
+          <NewConversationView onCreated={setSelectedConversation} />
         )}
       </main>
     </div>

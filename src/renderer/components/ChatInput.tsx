@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowUp, Plus, X, Loader2 } from "lucide-react";
 import {
   AspectRatio,
@@ -24,6 +24,25 @@ interface ChatInputProps {
   readonly isGenerating: boolean;
   readonly contextImages?: readonly AttachedImage[];
   readonly onRemoveContextImage?: (index: number) => void;
+  readonly acceptDropAnywhere?: boolean;
+}
+
+async function filesToAttachedImages(
+  files: FileList | File[]
+): Promise<AttachedImage[]> {
+  const images: AttachedImage[] = [];
+  for (const file of Array.from(files)) {
+    if (!file.type.startsWith("image/")) continue;
+    const buffer = await file.arrayBuffer();
+    const data = btoa(
+      new Uint8Array(buffer).reduce(
+        (acc, byte) => acc + String.fromCharCode(byte),
+        ""
+      )
+    );
+    images.push({ data, mimeType: file.type, name: file.name });
+  }
+  return images;
 }
 
 export function ChatInput({
@@ -31,12 +50,52 @@ export function ChatInput({
   isGenerating,
   contextImages,
   onRemoveContextImage,
+  acceptDropAnywhere,
 }: ChatInputProps) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
   const [prompt, setPrompt] = useState("");
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [prompt]);
+
+  useEffect(() => {
+    if (!acceptDropAnywhere) return;
+
+    const isFileDrag = (e: DragEvent) =>
+      e.dataTransfer?.types?.includes("Files") ?? false;
+
+    const handleDragOver = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+
+    const handleDrop = async (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      const files = e.dataTransfer?.files;
+      if (!files || files.length === 0) return;
+      const newImages = await filesToAttachedImages(files);
+      if (newImages.length > 0) {
+        setAttachedImages((prev) => [...prev, ...newImages]);
+      }
+    };
+
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("drop", handleDrop);
+    return () => {
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("drop", handleDrop);
+    };
+  }, [acceptDropAnywhere]);
 
   const effectiveModel =
     settings?.defaultModel ?? DEFAULT_SETTINGS.defaultModel;
@@ -60,7 +119,7 @@ export function ChatInput({
   };
 
   const handleCountChange = (value: number) => {
-    if (value >= 1 && value <= 8) {
+    if (value >= 1 && value <= 16) {
       updateSettings.mutate({ defaultCount: value });
     }
   };
@@ -81,7 +140,7 @@ export function ChatInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleSubmit();
     }
@@ -90,20 +149,7 @@ export function ChatInput({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-
-    const newImages: AttachedImage[] = [];
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith("image/")) continue;
-      const buffer = await file.arrayBuffer();
-      const data = btoa(
-        new Uint8Array(buffer).reduce(
-          (acc, byte) => acc + String.fromCharCode(byte),
-          ""
-        )
-      );
-      newImages.push({ data, mimeType: file.type, name: file.name });
-    }
-
+    const newImages = await filesToAttachedImages(files);
     setAttachedImages((prev) => [...prev, ...newImages]);
     e.target.value = "";
   };
@@ -169,12 +215,13 @@ export function ChatInput({
         {/* Main rounded input card */}
         <div className="input-card flex flex-col gap-2 rounded-[28px] border bg-card px-3 py-2.5 shadow-sm">
           <textarea
+            ref={textareaRef}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask Brainstorm to create…"
             rows={1}
-            className="max-h-40 min-h-[28px] w-full resize-none bg-transparent px-2 py-1 text-[15px] leading-6 outline-none placeholder:text-muted-foreground"
+            className="max-h-40 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1 text-[15px] leading-6 outline-none placeholder:text-muted-foreground"
           />
 
           <div className="flex items-center gap-2">
@@ -222,7 +269,7 @@ export function ChatInput({
                 <input
                   type="number"
                   min={1}
-                  max={8}
+                  max={16}
                   value={effectiveCount}
                   onChange={(e) =>
                     handleCountChange(parseInt(e.target.value, 10))
