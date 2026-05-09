@@ -1,6 +1,6 @@
 {
   "name": "brainstorm",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Gemini batch image generation desktop app",
   "main": ".vite/build/main.js",
   "scripts": {
