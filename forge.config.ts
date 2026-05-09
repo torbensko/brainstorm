@@ -10,6 +10,7 @@ import path from "path";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: path.resolve("resources/icon"),
     ...(process.env.CODESIGN_IDENTITY && {
       osxSign: {
         identity: process.env.CODESIGN_IDENTITY,
@@ -29,7 +30,7 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ["darwin"]),
-    new MakerDMG({}),
+    new MakerDMG({ icon: path.resolve("resources/icon.icns") }),
     new MakerDeb({}),
     new MakerRpm({}),
   ],
