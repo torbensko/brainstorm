@@ -1,5 +1,9 @@
-<!-- blint-managed v4 -->
+<!-- blint-managed v5 -->
 Generate or refine codebase design documentation: $ARGUMENTS
+
+**Frontmatter reference:** see `CLAUDE.md` → **Authoring Blint Files** → Documentation. Fill in every applicable field, including `match`. Bump `version` on every body change.
+
+**Writing style:** see `CLAUDE.md` → **Writing Documentation** for the body principles (concepts over inventories, design intent, conventions over instructions, etc.). If that section is missing, fall back to: focus on concepts and design intent, include implementation details only where they are load-bearing, avoid inventories and code dumps, prefer conventions over instructions, keep it concise.
 
 ## Instructions
 
@@ -15,23 +19,9 @@ Generate or refine codebase design documentation: $ARGUMENTS
 
 2. Explore the relevant code — read the key files, understand the architecture, entities, relationships, data flow, and design decisions.
 
-3. Write the documentation content **into the file specified by `--refine`** (or create a new file in the project's docs directory if no file was specified). Update the YAML frontmatter:
+3. Write the doc into the file specified by `--refine`, or create a new file in the project's docs directory if no file was specified. Author the frontmatter per the **Authoring Blint Files** reference in `CLAUDE.md`, and the body per the **Writing Documentation** guidance.
 
-```yaml
----
-name: <Title of the Documentation>
-description: <One-line summary of what this covers>
-version: 1
-match: <Natural language description of which files this doc covers>
-matchCriteria:
-  globs:
-    - "<glob pattern matching the files this doc covers>"
----
-```
-
-4. Follow the documentation writing principles defined in the project's `CLAUDE.md` under the "Writing Documentation" section. In short: open with a preamble, focus on concepts and design intent, include implementation details only where they are load-bearing, avoid inventories and code dumps, prefer conventions over instructions, and keep it concise. If `CLAUDE.md` has no such section, fall back to these principles directly.
-
-5. After writing the doc, verify it reads well and covers the key design concepts without being overly verbose.
+4. After writing the doc, verify it reads well and covers the key design concepts without being overly verbose.
 
 ## Refining existing documentation (file has content)
 

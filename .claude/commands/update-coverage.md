@@ -1,5 +1,11 @@
-<!-- blint-managed v4 -->
+<!-- blint-managed v5 -->
 Compute match criteria for Blint patterns and documentation files that are missing or have stale `matchCriteria`.
+
+## Scope
+
+If a file path argument is provided (e.g. `/update-coverage path/to/file.md`), **only process that single file** — read it, compute its `matchCriteria`, update its frontmatter, and report. Skip everything else.
+
+If no argument is provided, process all patterns and docs as described below.
 
 ## Patterns
 

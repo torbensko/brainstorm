@@ -1,5 +1,7 @@
-<!-- blint-managed v3 -->
+<!-- blint-managed v4 -->
 Generate or refine a Blint pattern: $ARGUMENTS
+
+**Frontmatter reference:** see `CLAUDE.md` → **Authoring Blint Files** → Patterns. Fill in every applicable field, including `match`. Bump `version` on every body change.
 
 ## Instructions
 
@@ -15,24 +17,9 @@ Generate or refine a Blint pattern: $ARGUMENTS
 
 2. Once you understand the convention, explore the relevant code thoroughly — read the key files, trace the implementation, understand the approach, conventions, and design decisions actually in use. Look at multiple examples if they exist to identify the consistent parts vs incidental details.
 
-3. Identify the **category** that best fits this pattern from the project's `activeCategories` in `.blint/project.json`. Use the `group:name` format (e.g. `quality:ci-cd`, `ops:environment`).
+3. Pick one or more `categories` (array) from `activeCategories` in `.blint/project.json` (`group:name` format).
 
-4. Write the pattern content **into the file specified by `--refine`** (or create a new file in `.blint/patterns/` if no file was specified). Update the YAML frontmatter:
-
-```yaml
----
-name: <Pattern Name>
-description: <One-line summary>
-version: 1
-category: <group:name from activeCategories>
-match: <Natural language description of what files this pattern applies to>
-matchCriteria:
-  globs:
-    - "<glob pattern>"
-  contentMatch:          # optional — include only if specific strings reliably identify relevant files
-    - "<string to match>"
----
-```
+4. Write the pattern into the file specified by `--refine`, or create a new file in `.blint/patterns/` if no file was specified. Author the frontmatter per the **Authoring Blint Files** reference in `CLAUDE.md`.
 
 5. Follow these writing principles for the pattern body:
 

@@ -1,5 +1,7 @@
-<!-- blint-managed v1 -->
+<!-- blint-managed v2 -->
 Generate or refine a spec: $ARGUMENTS
+
+**Frontmatter reference:** see `CLAUDE.md` → **Authoring Blint Files** → Specs. Authoring sets only `name`, `type`, and optionally `priority`. Lifecycle timestamps and environment fields are owned by `/start-spec`, `/check-patterns`, `/complete-spec`, and Blint's auto-detection — never set them here.
 
 ## Instructions
 
@@ -19,14 +21,7 @@ Generate or refine a spec: $ARGUMENTS
    - Which parts of the codebase are involved
    - Any patterns or documentation that should be referenced (use `@.blint/patterns/<name>` syntax for pattern references)
 
-3. Once the scope is clear, write the spec content **into the file specified by `--refine`** (or create a new file in `specs/` if no file was specified). Update the YAML frontmatter:
-
-```yaml
----
-name: <Spec Title>
-type: feature  # or "refinement" for smaller changes
----
-```
+3. Once the scope is clear, write the spec into the file specified by `--refine`, or create a new file in `specs/` if no file was specified. Author the frontmatter per the **Authoring Blint Files** reference in `CLAUDE.md`.
 
 4. The spec body should be concise and actionable — describe what to build, not how to build it step by step. Include:
    - A clear statement of what the feature/change is
