@@ -107,7 +107,10 @@ export async function requestImages(
 
 type ContentPart =
   | { text: string }
-  | { inlineData: { data: string; mimeType: string } };
+  | {
+      inlineData: { data: string; mimeType: string };
+      thoughtSignature?: string;
+    };
 
 interface Content {
   role: "user" | "model";
@@ -163,6 +166,9 @@ async function buildMultiTurnContents(
               data: firstImage.data,
               mimeType: firstImage.mimeType,
             },
+            ...(firstImage.thoughtSignature && {
+              thoughtSignature: firstImage.thoughtSignature,
+            }),
           },
         ],
       });
@@ -242,6 +248,7 @@ async function generateSingleImage(
     // Find the last non-thought image part (final rendered image)
     let imageData: string | null = null;
     let mimeType = "image/png";
+    let thoughtSignature: string | undefined;
 
     for (const part of responseParts) {
       // Skip thought parts — they're interim images
@@ -250,6 +257,8 @@ async function generateSingleImage(
       if (part.inlineData?.data) {
         imageData = part.inlineData.data;
         mimeType = part.inlineData.mimeType ?? "image/png";
+        thoughtSignature = (part as { thoughtSignature?: string })
+          .thoughtSignature;
       }
     }
 
@@ -265,6 +274,7 @@ async function generateSingleImage(
       data: imageData,
       mimeType,
       index,
+      ...(thoughtSignature && { thoughtSignature }),
     };
 
     // Persist and notify

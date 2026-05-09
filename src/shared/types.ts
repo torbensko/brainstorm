@@ -88,6 +88,10 @@ export interface GeneratedImage {
   readonly data: string; // base64
   readonly mimeType: string;
   readonly index: number;
+  // Opaque signature returned by image-thinking models (e.g. Nano Banana Pro).
+  // Must be echoed back on the same part in follow-up requests, or the API
+  // rejects the turn with "Image part is missing a thought_signature".
+  readonly thoughtSignature?: string;
 }
 
 export interface ImageResultEvent {
