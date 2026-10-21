@@ -3,8 +3,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 configuration="${CONFIGURATION:-release}"
-swift build -c "$configuration"
+sdk_version="$(xcrun --sdk macosx --show-sdk-version)"
+deployment_target="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' resources/Info.plist)"
+# The SwiftPM linker can stamp the deployment target as the SDK version, opting out of modern AppKit UI.
+# Keep backwards compatibility while advertising the SDK we actually build against.
+swift build -c "$configuration" -Xlinker -platform_version -Xlinker macos -Xlinker "$deployment_target" -Xlinker "$sdk_version"
 binary_directory="$(swift build -c "$configuration" --show-bin-path)"
+recorded_sdk="$(xcrun vtool -show-build "$binary_directory/Brainstorm" | awk '$1 == "sdk" { print $2; exit }')"
+if [[ "$recorded_sdk" != "$sdk_version" ]]; then
+    printf 'SDK metadata mismatch: built with %s, executable reports %s\n' "$sdk_version" "$recorded_sdk" >&2
+    exit 1
+fi
 app_directory="$PWD/dist/Brainstorm.app"
 mkdir -p "$app_directory/Contents/MacOS" "$app_directory/Contents/Resources"
 # Replace the file rather than overwriting code that a running app may have mapped.

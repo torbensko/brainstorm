@@ -24,47 +24,9 @@ struct WorkspaceView: View {
                     SidebarView(model: model)
                         .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
                 } detail: {
-                    VStack(spacing: 0) {
-                        if model.isDemo {
-                            HStack {
-                                Image(systemName: "play.rectangle")
-                                Text("Demo workspace").fontWeight(.medium)
-                                Text("Sample artwork · no API requests")
-                                Spacer()
-                            }
-                            .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 28).padding(.vertical, 9)
-                            .background(.yellow.opacity(0.12))
-                        }
-                        if model.projectBatches.isEmpty {
-                            VStack(spacing: 14) {
-                                Image(nsImage: NSApplication.shared.applicationIconImage)
-                                    .resizable().scaledToFit().frame(width: 76, height: 76)
-                                    .accessibilityLabel("Brainstorm logo")
-                                Text("What shall we explore?")
-                                    .font(.system(size: 30, weight: .regular, design: .serif))
-                                Text("One idea, a few different directions.")
-                                    .font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            GalleryView(model: model)
-                        }
-                        ComposerView(model: model).frame(maxWidth: 1200)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(StudioStyle.canvas)
-                    .navigationTitle("")
-                    .toolbarBackground(.regularMaterial, for: .windowToolbar)
-                    .toolbarBackground(.visible, for: .windowToolbar)
+                    ConversationView(model: model)
+                    .navigationTitle(model.project?.title ?? "New conversation")
                     .toolbar {
-                        ToolbarItem(placement: .navigation) {
-                            Text(model.project?.title ?? "New conversation")
-                                .font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.tail)
-                                .help(model.project?.title ?? "New conversation")
-                        }
-                        if #available(macOS 26.0, *) {
-                            ToolbarSpacer(.flexible)
-                        }
                         if model.activeJobCount > 0 {
                             ToolbarItem(placement: .primaryAction) {
                                 HStack(spacing: 8) {
@@ -155,30 +117,61 @@ private struct SidebarView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 SettingsLink { Label("Settings", systemImage: "gearshape") }
-                    .labelStyle(.iconOnly).buttonStyle(.plain)
+                    .labelStyle(.iconOnly).modifier(StudioButtonStyle()).tint(nil as Color?)
                     .foregroundStyle(.secondary).help("Settings")
             }.padding(14)
         }
     }
 }
 
-private struct GalleryView: View {
+/// Keep the primary scroll view at the detail column's root so macOS owns the toolbar underlap.
+private struct ConversationView: View {
     @ObservedObject var model: WorkspaceModel
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
+                    if model.isDemo {
+                        Label("Demo workspace · local sample artwork", systemImage: "play.rectangle")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     ForEach(Array(model.projectBatches.enumerated()), id: \.element.id) { index, batch in
                         BatchView(model: model, batch: batch, number: index + 1).id(batch.id)
                     }
                 }
                 .padding(28).frame(maxWidth: 1200, alignment: .leading).frame(maxWidth: .infinity)
             }
+            .overlay {
+                if model.projectBatches.isEmpty {
+                    VStack(spacing: 14) {
+                        Image(nsImage: NSApplication.shared.applicationIconImage)
+                            .resizable().scaledToFit().frame(width: 76, height: 76)
+                            .accessibilityLabel("Brainstorm logo")
+                        Text("What shall we explore?")
+                            .font(.system(size: 30, weight: .regular, design: .serif))
+                        Text("One idea, a few different directions.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }.allowsHitTesting(false)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                ComposerView(model: model).frame(maxWidth: 1200).frame(maxWidth: .infinity)
+                    .background(StudioStyle.canvas, ignoresSafeAreaEdges: .bottom)
+            }
+            .background(StudioStyle.canvas)
             .onChange(of: model.projectBatches.count) { old, new in
                 if new > old, let id = model.projectBatches.last?.id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
             }
             .defaultScrollAnchor(.bottom)
+            .modifier(ConversationScrollEdges())
         }
+    }
+}
+
+private struct ConversationScrollEdges: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) { content.scrollEdgeEffectStyle(.hard, for: .top) }
+        else { content }
     }
 }
 

@@ -78,7 +78,7 @@ struct ComposerView: View {
             Button("Paste image") { Task { await model.pasteImage() } }
         } label: {
             Image(systemName: "paperclip").font(.system(size: 17)).frame(width: 26, height: 32)
-        }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Attach reference images")
+        }.studioMenu(showIndicator: false).help("Attach reference images")
         Menu {
             ForEach(ProviderID.allCases) { provider in
                 Section(provider.title) {
@@ -137,7 +137,7 @@ struct ComposerView: View {
                 Text(model.parentAssetID == nil ? "Explore" : "Refine").fontWeight(.medium)
             }.padding(.horizontal, 5).padding(.vertical, 3)
         }
-        .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large)
+        .modifier(StudioButtonStyle(prominent: true)).controlSize(.large)
         .keyboardShortcut(.return, modifiers: .command).disabled(!model.canGenerate)
         .help("Generate images · ⌘ Return")
     }
@@ -187,9 +187,28 @@ private struct ComposerPillSurface: ViewModifier {
 }
 
 private extension View {
-    func studioMenu() -> some View {
-        menuStyle(.borderlessButton).menuIndicator(.visible).fixedSize()
-            .font(.system(size: 12, weight: .medium)).foregroundStyle(.primary)
-            .modifier(ComposerPillSurface())
+    @ViewBuilder func studioMenu(showIndicator: Bool = true) -> some View {
+        if #available(macOS 26.0, *) {
+            menuStyle(.button).buttonStyle(.glass).buttonBorderShape(.capsule)
+                .menuIndicator(showIndicator ? .visible : .hidden).controlSize(.large).fixedSize()
+                .font(.system(size: 12, weight: .medium))
+        } else {
+            menuStyle(.borderlessButton).menuIndicator(showIndicator ? .visible : .hidden).fixedSize()
+                .font(.system(size: 12, weight: .medium)).foregroundStyle(.primary)
+                .modifier(ComposerPillSurface())
+        }
+    }
+}
+
+struct StudioButtonStyle: ViewModifier {
+    var prominent = false
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            if prominent { content.buttonStyle(.glassProminent).buttonBorderShape(.capsule) }
+            else { content.buttonStyle(.glass).buttonBorderShape(.capsule) }
+        } else {
+            if prominent { content.buttonStyle(.borderedProminent).buttonBorderShape(.capsule) }
+            else { content.buttonStyle(.bordered).buttonBorderShape(.capsule) }
+        }
     }
 }
