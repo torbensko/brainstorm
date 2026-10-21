@@ -427,6 +427,8 @@ final class WorkspaceModel: ObservableObject {
         String(name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-").prefix(150))
     }
     private func restore(_ project: Project?) {
+        saveTask?.cancel()
+        saveTask = nil
         restoring = true
         selectedProjectID = project?.id
         prompt = project?.prompt ?? ""
@@ -450,13 +452,19 @@ final class WorkspaceModel: ObservableObject {
     }
     func saveDraft() async throws {
         guard var project, let library else { return }
+        let saved = project
         project.prompt = prompt; project.referenceIDs = referenceIDs; project.parentAssetID = parentAssetID
-        project.updatedAt = .now
         project.updateAutomaticTitle(firstMessage: projectBatches.first?.prompt)
+        // Focus and navigation also flush drafts; only actual changes count as activity.
+        guard project != saved else { return }
+        project.updatedAt = .now
         try await library.saveProject(project)
         if let index = projects.firstIndex(where: { $0.id == project.id }) {
             project.suggestedTitle = projects[index].suggestedTitle ?? project.suggestedTitle
             projects[index] = project
+            projects.sort {
+                $0.updatedAt == $1.updatedAt ? $0.createdAt > $1.createdAt : $0.updatedAt > $1.updatedAt
+            }
         }
     }
     private func preferenceKey(_ name: String) -> String { isDemo ? "demo.\(name)" : name }

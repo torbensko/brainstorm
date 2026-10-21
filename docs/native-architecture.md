@@ -1,7 +1,7 @@
 ---
 name: Native Brainstorm architecture
 description: Concepts, image revisions, provider boundaries, and durable local generation.
-version: 10
+version: 11
 match: Native macOS app state, storage, image generation, provider adapters, packaging, and tests.
 matchCriteria:
   globs:
@@ -19,7 +19,7 @@ The SwiftUI app owns navigation and editable drafts. BrainstormCore owns persist
 
 The interface presents concepts as conversations. A native sidebar list provides navigation within a standard macOS split window. The system window title and toolbar occupy the detail column while the sidebar extends behind its window controls for the full window height. A compose icon sits beside the sidebar toggle and remains available when the sidebar closes. A small AppKit placement adapter moves that toolbar item ahead of the native tracking separator; AppKit retains ownership of the toolbar and sidebar transitions. Toolbar search filters conversations and reveals the sidebar when needed, with Settings beside it. Account status remains at the bottom of the sidebar. Creating a conversation clears the search filter and focuses its composer.
 
-Sidebar rows use the latest successfully generated image as their preview, with the number of generation sets (iterations) and completed images beneath the name. Reference attachments and failed or pending jobs never count as generated images. Empty conversations are drafts. Search covers the displayed name, draft, and sent messages.
+Sidebar rows use the latest successfully generated image as their preview, with the number of generation sets (iterations) and completed images beneath the name. Reference attachments and failed or pending jobs never count as generated images. Empty conversations are drafts. New conversations appear at the top, and real draft edits or sent messages update recency immediately. Browsing, focus changes, and unchanged autosaves leave the order alone. Search covers the displayed name, draft, and sent messages.
 
 The detail column keeps its primary scroll view at the root, with the composer in a bottom safe-area inset, so content scrolls beneath the system toolbar. A hard scroll-edge effect keeps the title legible over images. Do not force a window-wide toolbar background or replace native sidebar transitions with custom chrome. The composer stays at the bottom for both new and existing conversations, with a centered logo and opening prompt in the empty state. Sent messages show their text and reference images above each set of generated results. An accepted send clears the composer and saves the empty draft; a rejected send preserves the draft and attachments. Native button-style menus give model, shape, quality, and image count a consistent treatment and wrap when space is limited. Supported systems use Liquid Glass for toolbar controls and primary actions; earlier systems use bordered controls. Subscription mode omits quality because Codex manages it.
 

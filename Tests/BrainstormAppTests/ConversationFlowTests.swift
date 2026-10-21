@@ -5,6 +5,49 @@ import BrainstormCore
 
 @Suite(.serialized) @MainActor
 struct ConversationFlowTests {
+    @Test func newConversationsStayFirstWhenBrowsingAndRefreshing() async throws {
+        let fixture = try ConversationFixture()
+        let model = fixture.model
+        await model.createProject(prompt: "An older conversation")
+        let olderID = try #require(model.selectedProjectID)
+        await model.createProject()
+        let newestID = try #require(model.selectedProjectID)
+        let initialOrder = model.projects.map(\.id)
+        #expect(initialOrder == [newestID, olderID])
+        let saved = try await fixture.library.snapshot().projects
+
+        // Navigation, focus changes, and quitting all flush drafts, even when nothing changed.
+        await model.selectProject(olderID)
+        try await model.saveDraft()
+        try await model.reload()
+        #expect(model.visibleProjects.map(\.id) == initialOrder)
+        await model.selectProject(newestID)
+        try await model.saveDraft()
+        try await model.reload()
+        #expect(model.visibleProjects.map(\.id) == initialOrder)
+        #expect(try await fixture.library.snapshot().projects == saved)
+
+        let reopened = try LibraryStore(url: fixture.root.appendingPathComponent("library.sqlite"))
+        #expect(try await reopened.snapshot().projects.map(\.id) == initialOrder)
+
+        // A real edit moves an older conversation immediately, without waiting for a refresh.
+        await model.selectProject(olderID)
+        model.prompt = "An updated design idea"
+        try await model.saveDraft()
+        #expect(model.visibleProjects.first?.id == olderID)
+        try await model.reload()
+        #expect(model.visibleProjects.first?.id == olderID)
+
+        // Creating another conversation flushes the pending edit before placing the new row first.
+        model.prompt = "One final draft change"
+        await model.createProject()
+        let finalID = try #require(model.selectedProjectID)
+        #expect(model.visibleProjects.first?.id == finalID)
+        try await model.reload()
+        #expect(model.visibleProjects.first?.id == finalID)
+        #expect(model.projects.first { $0.id == olderID }?.prompt == "One final draft change")
+    }
+
     @Test func sendingMovesPromptAndImagesIntoHistoryAndPersistsAnEmptyComposer() async throws {
         let fixture = try ConversationFixture()
         let model = fixture.model

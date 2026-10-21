@@ -40,7 +40,7 @@ public actor LibraryStore {
     }
 
     public func snapshot() throws -> LibrarySnapshot {
-        let projects = try db.execute("SELECT * FROM projects ORDER BY updated_at DESC").map(project)
+        let projects = try db.execute("SELECT * FROM projects ORDER BY updated_at DESC, created_at DESC").map(project)
         let batches = try db.execute("SELECT * FROM batches ORDER BY created_at, rowid").map(batch)
         let assets = try db.execute("SELECT * FROM assets ORDER BY created_at").map(asset)
         return LibrarySnapshot(projects: projects, batches: batches, assets: assets)
