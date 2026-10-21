@@ -67,18 +67,26 @@ public struct GenerationSettings: Codable, Equatable, Sendable {
     }
 }
 
+public enum ProjectTitleMode: String, Sendable { case automatic, custom }
+
 public struct Project: Identifiable, Sendable, Equatable {
     public let id: UUID
     public var title: String
+    public var titleMode: ProjectTitleMode
     public var prompt: String
     public var parentAssetID: UUID?
     public var referenceIDs: [UUID]
     public let createdAt: Date
     public var updatedAt: Date
-    public init(id: UUID = UUID(), title: String = "Untitled concept", prompt: String = "",
+    public init(id: UUID = UUID(), title: String = "Untitled concept", titleMode: ProjectTitleMode = .automatic, prompt: String = "",
                 parentAssetID: UUID? = nil, referenceIDs: [UUID] = [], createdAt: Date = .now, updatedAt: Date = .now) {
-        self.id = id; self.title = title; self.prompt = prompt; self.parentAssetID = parentAssetID
+        self.id = id; self.title = title; self.titleMode = titleMode; self.prompt = prompt; self.parentAssetID = parentAssetID
         self.referenceIDs = referenceIDs; self.createdAt = createdAt; self.updatedAt = updatedAt
+    }
+
+    public mutating func updateAutomaticTitle(firstMessage: String? = nil) {
+        guard titleMode == .automatic else { return }
+        title = PromptBuilder.title(from: firstMessage ?? prompt)
     }
 }
 

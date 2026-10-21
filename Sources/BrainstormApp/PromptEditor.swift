@@ -11,10 +11,11 @@ struct PromptEditor: NSViewRepresentable {
     let onSubmit: () -> Void
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
+        let scroll = PromptScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
+        scroll.scrollerStyle = .overlay
         let editor = AttachmentTextView(frame: scroll.contentView.bounds)
         editor.minSize = NSSize(width: 0, height: 60)
         editor.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -26,7 +27,7 @@ struct PromptEditor: NSViewRepresentable {
         editor.isHorizontallyResizable = false
         editor.autoresizingMask = [.width]
         editor.textContainer?.widthTracksTextView = true
-        editor.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        editor.textContainer?.containerSize = NSSize(width: editor.bounds.width, height: CGFloat.greatestFiniteMagnitude)
         editor.textContainer?.lineFragmentPadding = 0
         editor.textContainerInset = NSSize(width: 0, height: 3)
         editor.font = .systemFont(ofSize: 15)
@@ -40,6 +41,7 @@ struct PromptEditor: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let editor = scroll.documentView as? AttachmentTextView else { return }
+        editor.isEditable = context.environment.isEnabled
         editor.onAttachments = onAttachments
         editor.onError = onError
         editor.onSubmit = onSubmit
@@ -61,13 +63,19 @@ struct PromptEditor: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView scroll: NSScrollView, context: Context) -> CGSize? {
-        guard let width = proposal.width, width > 0,
-              let editor = scroll.documentView as? NSTextView,
-              let container = editor.textContainer, let layout = editor.layoutManager else { return nil }
-        container.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+        guard let width = proposal.width, width.isFinite, width > 0 else { return nil }
+        // SwiftUI probes multiple widths. Measuring must never resize the live text container.
+        let font = NSFont.systemFont(ofSize: 15)
+        let storage = NSTextStorage(string: text, attributes: [.font: font])
+        let layout = NSLayoutManager()
+        let container = NSTextContainer(size: NSSize(width: width, height: CGFloat.greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        storage.addLayoutManager(layout)
+        layout.addTextContainer(container)
         layout.ensureLayout(for: container)
-        let lineHeight = layout.defaultLineHeight(for: editor.font ?? .systemFont(ofSize: 15))
-        let height = min(max(layout.usedRect(for: container).height, lineHeight * 3), lineHeight * 7) + 6
+        let lineHeight = layout.defaultLineHeight(for: font)
+        let contentHeight = max(layout.usedRect(for: container).maxY, layout.extraLineFragmentRect.maxY)
+        let height = min(max(contentHeight, lineHeight * 3), lineHeight * 7) + 6
         return CGSize(width: width, height: height)
     }
 
@@ -79,6 +87,18 @@ struct PromptEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             if let editor = notification.object as? NSTextView { parent.text = editor.string }
         }
+    }
+}
+
+final class PromptScrollView: NSScrollView {
+    override func layout() {
+        super.layout()
+        guard let editor = documentView as? NSTextView else { return }
+        let width = contentView.bounds.width
+        if editor.frame.width != width {
+            editor.setFrameSize(NSSize(width: width, height: max(editor.frame.height, contentView.bounds.height)))
+        }
+        editor.textContainer?.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
     }
 }
 

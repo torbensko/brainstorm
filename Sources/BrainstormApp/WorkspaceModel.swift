@@ -13,9 +13,9 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var referenceIDs: [UUID] = []
     @Published private(set) var parentAssetID: UUID?
     @Published var settings = GenerationSettings() { didSet { saveSettings() } }
-    @Published var count = 4 { didSet { UserDefaults.standard.set(count, forKey: preferenceKey("generationCount")) } }
+    @Published var count = 4 { didSet { preferences.set(count, forKey: preferenceKey("generationCount")) } }
     @Published var concurrency = 3 { didSet {
-        UserDefaults.standard.set(concurrency, forKey: preferenceKey("concurrency"))
+        preferences.set(concurrency, forKey: preferenceKey("concurrency"))
         if let queue { Task { await queue.setConcurrency(concurrency) } }
     } }
     @Published var search = ""
@@ -48,6 +48,19 @@ final class WorkspaceModel: ObservableObject {
     private var eventTask: Task<Void, Never>?
     private var navigationRevision = 0
     private(set) var libraryURL: URL?
+    private let preferences: UserDefaults
+
+    init() { preferences = .standard }
+
+    init(library: LibraryStore, assetStore: AssetStore, credentials: any CredentialStore,
+         providers: ProviderRegistry, preferences: UserDefaults) {
+        self.preferences = preferences
+        self.library = library; self.assetStore = assetStore
+        self.credentials = credentials; self.providers = providers
+        queue = GenerationQueue(library: library, assets: assetStore, credentials: credentials, providers: providers)
+        started = true
+        isLoading = false
+    }
 
     var project: Project? { projects.first { $0.id == selectedProjectID } }
     var visibleProjects: [Project] {
@@ -84,21 +97,21 @@ final class WorkspaceModel: ObservableObject {
             let queue = GenerationQueue(library: library, assets: assetStore, credentials: credentials, providers: providers)
             self.queue = queue
             try await queue.prepare()
-            if let data = UserDefaults.standard.data(forKey: preferenceKey("generationSettings")) {
+            if let data = preferences.data(forKey: preferenceKey("generationSettings")) {
                 settings = try JSONDecoder().decode(GenerationSettings.self, from: data)
                 try settings.validate()
             }
-            if !UserDefaults.standard.bool(forKey: preferenceKey("subscriptionDefaultApplied")) {
+            if !preferences.bool(forKey: preferenceKey("subscriptionDefaultApplied")) {
                 settings = GenerationSettings()
-                UserDefaults.standard.set(true, forKey: preferenceKey("subscriptionDefaultApplied"))
+                preferences.set(true, forKey: preferenceKey("subscriptionDefaultApplied"))
             }
-            let savedCount = UserDefaults.standard.integer(forKey: preferenceKey("generationCount"))
+            let savedCount = preferences.integer(forKey: preferenceKey("generationCount"))
             if (1...16).contains(savedCount) { count = savedCount }
-            let savedConcurrency = UserDefaults.standard.integer(forKey: preferenceKey("concurrency"))
+            let savedConcurrency = preferences.integer(forKey: preferenceKey("concurrency"))
             if (1...6).contains(savedConcurrency) { concurrency = savedConcurrency }
             await queue.setConcurrency(concurrency)
             try await reload()
-            let savedID = UserDefaults.standard.string(forKey: isDemo ? "demoSelectedProject" : "selectedProject").flatMap(UUID.init(uuidString:))
+            let savedID = preferences.string(forKey: isDemo ? "demoSelectedProject" : "selectedProject").flatMap(UUID.init(uuidString:))
             restore(projects.first { $0.id == savedID } ?? projects.first)
             isLoading = false
             await refreshKeys()
@@ -209,6 +222,15 @@ final class WorkspaceModel: ObservableObject {
                                         jobs: (0..<count).map { GenerationJob(batchID: id, position: $0) })
             try await queue.submit(batch)
             try await reload()
+            // Clear only the accepted message. A changed draft must survive the asynchronous submission.
+            if selectedProjectID == batch.projectID && prompt == batch.prompt &&
+                parentAssetID == batch.parentAssetID &&
+                [parentAssetID].compactMap({ $0 }) + referenceIDs.filter({ $0 != parentAssetID }) == batch.referenceIDs {
+                prompt = ""
+                referenceIDs = []
+                parentAssetID = nil
+                try await saveDraft()
+            }
         } catch { errorMessage = error.localizedDescription }
     }
     func selectProvider(_ provider: ProviderID) {
@@ -314,6 +336,7 @@ final class WorkspaceModel: ObservableObject {
             try await saveDraft()
             var updated = projects.first { $0.id == project.id } ?? project
             updated.title = String(title.prefix(120))
+            updated.titleMode = .custom
             try await library?.saveProject(updated)
             try await reload()
         } catch { errorMessage = error.localizedDescription }
@@ -371,7 +394,7 @@ final class WorkspaceModel: ObservableObject {
         parentAssetID = project?.parentAssetID
         referenceIDs = project?.referenceIDs ?? []
         selectedAssetID = nil
-        UserDefaults.standard.set(project?.id.uuidString, forKey: isDemo ? "demoSelectedProject" : "selectedProject")
+        preferences.set(project?.id.uuidString, forKey: isDemo ? "demoSelectedProject" : "selectedProject")
         restoring = false
     }
     private func scheduleSave() {
@@ -390,13 +413,13 @@ final class WorkspaceModel: ObservableObject {
         guard var project, let library else { return }
         project.prompt = prompt; project.referenceIDs = referenceIDs; project.parentAssetID = parentAssetID
         project.updatedAt = .now
-        if project.title == "Untitled concept", !prompt.isEmpty { project.title = PromptBuilder.title(from: prompt) }
+        project.updateAutomaticTitle(firstMessage: projectBatches.first?.prompt)
         try await library.saveProject(project)
         if let index = projects.firstIndex(where: { $0.id == project.id }) { projects[index] = project }
     }
     private func preferenceKey(_ name: String) -> String { isDemo ? "demo.\(name)" : name }
     private func saveSettings() {
-        do { UserDefaults.standard.set(try JSONEncoder().encode(settings), forKey: preferenceKey("generationSettings")) }
+        do { preferences.set(try JSONEncoder().encode(settings), forKey: preferenceKey("generationSettings")) }
         catch { errorMessage = error.localizedDescription }
     }
 }

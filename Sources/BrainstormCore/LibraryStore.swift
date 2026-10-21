@@ -6,11 +6,28 @@ public actor LibraryStore {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         db = try SQLiteConnection(url: url)
         let version = try db.execute("PRAGMA user_version").first?.int("user_version") ?? 0
-        guard version <= 1 else { throw BrainstormError.storage("This library needs a newer version of Brainstorm.") }
+        guard version <= 2 else { throw BrainstormError.storage("This library needs a newer version of Brainstorm.") }
         if version == 0 {
             try db.transaction {
                 for statement in Self.schema { try db.execute(statement) }
                 try db.execute("PRAGMA user_version = 1")
+            }
+        }
+        if version < 2 {
+            try db.transaction {
+                try db.execute("ALTER TABLE projects ADD COLUMN title_mode TEXT NOT NULL DEFAULT 'custom' CHECK(title_mode IN ('automatic','custom'))")
+                for row in try db.execute("SELECT id,title,prompt FROM projects") {
+                    let id = try row.id("id")
+                    let first = try db.execute("SELECT prompt FROM batches WHERE project_id=? ORDER BY created_at,rowid LIMIT 1", [.id(id)]).first
+                    let expected = PromptBuilder.title(from: try first?.string("prompt") ?? row.string("prompt"))
+                    let title = try row.string("title")
+                    // Legacy autosave could freeze a title at the first character. Preserve other renamed titles.
+                    if title == "Untitled concept" || title == expected ||
+                        (title.count == 1 && expected.lowercased().hasPrefix(title.lowercased())) {
+                        try db.execute("UPDATE projects SET title=?,title_mode='automatic' WHERE id=?", [.text(expected), .id(id)])
+                    }
+                }
+                try db.execute("PRAGMA user_version = 2")
             }
         }
     }
@@ -25,10 +42,10 @@ public actor LibraryStore {
     public func saveProject(_ value: Project) throws {
         try db.transaction {
             try db.execute("""
-                INSERT INTO projects(id,title,prompt,parent_asset_id,created_at,updated_at) VALUES(?,?,?,?,?,?)
-                ON CONFLICT(id) DO UPDATE SET title=excluded.title,prompt=excluded.prompt,
+                INSERT INTO projects(id,title,title_mode,prompt,parent_asset_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET title=excluded.title,title_mode=excluded.title_mode,prompt=excluded.prompt,
                 parent_asset_id=excluded.parent_asset_id,updated_at=excluded.updated_at
-                """, [.id(value.id), .text(value.title), .text(value.prompt), .optionalID(value.parentAssetID),
+                """, [.id(value.id), .text(value.title), .text(value.titleMode.rawValue), .text(value.prompt), .optionalID(value.parentAssetID),
                         .number(value.createdAt.timeIntervalSince1970), .number(value.updatedAt.timeIntervalSince1970)])
             try validateAssets(value.referenceIDs + [value.parentAssetID].compactMap { $0 }, projectID: value.id)
             try db.execute("DELETE FROM project_references WHERE project_id=?", [.id(value.id)])
@@ -152,8 +169,9 @@ public actor LibraryStore {
     }
     private func project(_ row: SQLRow) throws -> Project {
         let id = try row.id("id")
+        guard let titleMode = ProjectTitleMode(rawValue: try row.string("title_mode")) else { throw BrainstormError.storage("Unknown conversation title mode.") }
         let references = try db.execute("SELECT asset_id FROM project_references WHERE project_id=? ORDER BY position", [.id(id)]).map { try $0.id("asset_id") }
-        return try Project(id: id, title: row.string("title"), prompt: row.string("prompt"), parentAssetID: row.optionalID("parent_asset_id"),
+        return try Project(id: id, title: row.string("title"), titleMode: titleMode, prompt: row.string("prompt"), parentAssetID: row.optionalID("parent_asset_id"),
                            referenceIDs: references, createdAt: row.date("created_at"), updatedAt: row.date("updated_at"))
     }
     private func asset(_ row: SQLRow) throws -> Asset {

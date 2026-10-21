@@ -36,33 +36,31 @@ struct WorkspaceView: View {
                             .background(.yellow.opacity(0.12))
                         }
                         if model.projectBatches.isEmpty {
-                            Spacer(minLength: 36)
-                            Text("What shall we explore?")
-                                .font(.system(size: 34, weight: .regular, design: .serif))
-                                .padding(.bottom, 20)
-                            ComposerView(model: model).frame(maxWidth: 1000)
-                            Text("One idea, a few different directions.").font(.subheadline).foregroundStyle(.tertiary).padding(.top, 6)
-                            Spacer(minLength: 36)
-                            Spacer(minLength: 0)
+                            VStack(spacing: 14) {
+                                Image(nsImage: NSApplication.shared.applicationIconImage)
+                                    .resizable().scaledToFit().frame(width: 76, height: 76)
+                                    .accessibilityLabel("Brainstorm logo")
+                                Text("What shall we explore?")
+                                    .font(.system(size: 30, weight: .regular, design: .serif))
+                                Text("One idea, a few different directions.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
                             GalleryView(model: model)
-                            ComposerView(model: model).frame(maxWidth: 1200)
                         }
+                        ComposerView(model: model).frame(maxWidth: 1200)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(StudioStyle.canvas.ignoresSafeArea(.container, edges: .top))
+                    .background(StudioStyle.canvas)
                     .navigationTitle("")
-                    .toolbarBackground(.hidden, for: .windowToolbar)
+                    .toolbarBackground(.regularMaterial, for: .windowToolbar)
+                    .toolbarBackground(.visible, for: .windowToolbar)
                     .toolbar {
                         ToolbarItem(placement: .navigation) {
-                            HStack(spacing: 9) {
-                                Image(nsImage: NSApplication.shared.applicationIconImage)
-                                    .resizable().scaledToFit().frame(width: 26, height: 26)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6)).accessibilityLabel("Brainstorm logo")
-                                Text(model.project?.title ?? "New conversation")
-                                    .font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.tail)
-                                    .help(model.project?.title ?? "New conversation")
-                            }
+                            Text(model.project?.title ?? "New conversation")
+                                .font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.tail)
+                                .help(model.project?.title ?? "New conversation")
                         }
                         if #available(macOS 26.0, *) {
                             ToolbarSpacer(.flexible)
@@ -74,9 +72,6 @@ struct WorkspaceView: View {
                                     Text("\(model.activeJobCount) in progress").font(.caption).foregroundStyle(.secondary)
                                 }
                             }
-                        }
-                        ToolbarItem(placement: .primaryAction) {
-                            SettingsLink { Label("Settings", systemImage: "gearshape") }.help("Settings")
                         }
                     }
                 }
@@ -152,15 +147,18 @@ private struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .searchable(text: $model.search, placement: .sidebar, prompt: "Search conversations")
+        .disabled(model.isImporting || model.isSubmitting || model.isLoading)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Circle().fill(model.hasKeys.contains(model.settings.provider) ? StudioStyle.accent : Color.orange).frame(width: 6, height: 6)
                 Text(model.hasKeys.contains(model.settings.provider) ? model.settings.provider.title : model.settings.provider == .chatGPT ? "Connect ChatGPT" : "Add an API key")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                SettingsLink { Label("Settings", systemImage: "gearshape") }
+                    .labelStyle(.iconOnly).buttonStyle(.plain)
+                    .foregroundStyle(.secondary).help("Settings")
             }.padding(14)
         }
-        .disabled(model.isImporting || model.isSubmitting || model.isLoading)
     }
 }
 
@@ -174,11 +172,12 @@ private struct GalleryView: View {
                         BatchView(model: model, batch: batch, number: index + 1).id(batch.id)
                     }
                 }
-                .padding(28).frame(maxWidth: 1500, alignment: .leading).frame(maxWidth: .infinity)
+                .padding(28).frame(maxWidth: 1200, alignment: .leading).frame(maxWidth: .infinity)
             }
             .onChange(of: model.projectBatches.count) { old, new in
-                if new > old, let id = model.projectBatches.last?.id { withAnimation { proxy.scrollTo(id, anchor: .top) } }
+                if new > old, let id = model.projectBatches.last?.id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
             }
+            .defaultScrollAnchor(.bottom)
         }
     }
 }
@@ -188,20 +187,38 @@ private struct BatchView: View {
     let batch: GenerationBatch
     let number: Int
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                if let parentID = batch.parentAssetID, let parent = model.assets[parentID] {
-                    AssetImage(url: model.assetURL(parent, thumbnail: true)).frame(width: 42, height: 42).clipShape(RoundedRectangle(cornerRadius: 7))
-                        .onTapGesture { model.selectedAssetID = parentID }.help("View the original image")
-                }
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 8) {
-                        Text(batch.parentAssetID == nil ? "EXPLORATION \(number.formatted(.number.precision(.integerLength(2))))" : "REFINEMENT \(number.formatted(.number.precision(.integerLength(2))))")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(1.1).foregroundStyle(StudioStyle.accent)
-                        Text(batch.settings.provider == .chatGPT ? "· ChatGPT subscription" : "· \(batch.settings.provider.title) · \(batch.settings.quality.title)").font(.caption2).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .top) {
+                Spacer(minLength: 50)
+                VStack(alignment: .leading, spacing: 12) {
+                    if !batch.referenceIDs.isEmpty {
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 8) {
+                                ForEach(batch.referenceIDs.compactMap { model.assets[$0] }) { asset in
+                                    Button { model.selectedAssetID = asset.id } label: {
+                                        AssetImage(url: model.assetURL(asset, thumbnail: true))
+                                            .frame(width: 120, height: 100)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                    .buttonStyle(.plain).help(asset.name)
+                                    .accessibilityLabel("View reference image: \(asset.name)")
+                                }
+                            }
+                        }.scrollIndicators(.hidden)
                     }
-                    Text(batch.prompt).font(.system(size: 14, weight: .medium)).lineLimit(3).textSelection(.enabled)
+                    Text(batch.prompt).font(.system(size: 14)).textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(16)
+                .frame(maxWidth: 640, alignment: .leading)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 18))
+            }
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").foregroundStyle(StudioStyle.accent)
+                Text(batch.parentAssetID == nil ? "Exploration \(number)" : "Refinement \(number)")
+                    .font(.system(size: 13, weight: .medium))
+                Text(batch.settings.provider == .chatGPT ? "ChatGPT" : batch.settings.provider.title)
+                    .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Menu {
                     Button("Use this prompt again") { model.useBrief(from: batch) }
@@ -218,9 +235,6 @@ private struct BatchView: View {
             HStack(spacing: 10) {
                 Text(batch.isActive ? "\(batch.completedCount) of \(batch.jobs.count) ready" : "\(batch.completedCount) of \(batch.jobs.count) images")
                     .font(.caption).foregroundStyle(.secondary)
-                if !batch.referenceIDs.isEmpty {
-                    Text("· \(batch.referenceIDs.count) reference\(batch.referenceIDs.count == 1 ? "" : "s")").font(.caption).foregroundStyle(.tertiary)
-                }
                 Spacer()
                 if batch.completedCount > 0 {
                     Button { model.exportAll(batch) } label: { Label("Export set", systemImage: "square.and.arrow.up") }

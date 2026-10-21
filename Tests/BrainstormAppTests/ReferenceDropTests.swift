@@ -25,6 +25,30 @@ struct ReferenceDropTests {
         #expect(prompt == "First line\nSecond line")
     }
 
+    @Test func editorWrapsAtItsActualWidthAfterMeasurementAndResizing() throws {
+        _ = NSApplication.shared
+        let prompt = "Show some of the ways I could style this room"
+        let view = PromptEditor(text: .constant(prompt), placeholder: "Describe an idea", focusID: nil,
+                                onAttachments: { _ in }, onError: { Issue.record($0) }, onSubmit: {})
+        let controller = NSHostingController(rootView: view.frame(maxWidth: .infinity))
+        let host = controller.view
+        for width: CGFloat in [900, 180, 700] {
+            host.frame = NSRect(x: 0, y: 0, width: width, height: 100)
+            host.layoutSubtreeIfNeeded()
+            // Probe a narrow alternative without changing the final frame, as SwiftUI layouts do.
+            _ = controller.sizeThatFits(in: NSSize(width: 120, height: 200))
+            let editor = try #require(findEditor(in: host))
+            let container = try #require(editor.textContainer)
+            let layout = try #require(editor.layoutManager)
+            layout.ensureLayout(for: container)
+            #expect(abs(editor.bounds.width - width) < 2)
+            #expect(abs(container.size.width - editor.bounds.width) < 2)
+            var lines = 0
+            layout.enumerateLineFragments(forGlyphRange: layout.glyphRange(for: container)) { _, _, _, _, _ in lines += 1 }
+            #expect(width > 500 ? lines == 1 : lines > 1)
+        }
+    }
+
     @Test func filesDroppedOnEditorAttachOnceWithoutChangingPrompt() throws {
         _ = NSApplication.shared
         let board = NSPasteboard.withUniqueName()

@@ -35,6 +35,7 @@ struct ComposerView: View {
                              onAttachments: { attachments in Task { await model.importAttachments(attachments) } },
                              onError: { model.errorMessage = $0.localizedDescription },
                              onSubmit: { Task { await model.generate() } })
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .topLeading) {
                         if model.prompt.isEmpty {
                             Text(placeholder).font(.system(size: 15)).foregroundStyle(.placeholder)
@@ -66,7 +67,7 @@ struct ComposerView: View {
             }.font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 8)
         }
         .padding(.horizontal, 28).padding(.top, 14).padding(.bottom, 18)
-        .disabled(model.isLoading)
+        .disabled(model.isLoading || model.isSubmitting)
     }
     private var placeholder: String {
         model.parentAssetID == nil ? "Describe the idea you want to explore…" : "What would you like to change?"
