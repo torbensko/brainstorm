@@ -5,6 +5,42 @@ import BrainstormCore
 
 @Suite(.serialized) @MainActor
 struct ConversationFlowTests {
+    @Test func composeReusesOneEmptyDraftAndProtectsWorkInProgress() async throws {
+        let fixture = try ConversationFixture()
+        let model = fixture.model
+        await model.createProject()
+        let emptyID = try #require(model.selectedProjectID)
+        let focusRequest = model.composerFocusRequest
+        await model.createProject()
+        #expect(model.selectedProjectID == emptyID && model.projects.count == 1)
+        #expect(model.composerFocusRequest != focusRequest)
+
+        await model.createProject(prompt: "A room with warm colours")
+        #expect(model.selectedProjectID == emptyID && model.prompt == "A room with warm colours")
+        await model.createProject()
+        let reusableID = try #require(model.selectedProjectID)
+        #expect(reusableID != emptyID && model.projects.count == 2)
+        await model.selectProject(emptyID)
+        model.prompt = "Keep this unsaved idea"
+        model.search = "room"
+        await model.createProject()
+        #expect(model.selectedProjectID == reusableID && model.projects.count == 2)
+        #expect(model.visibleProjects.first?.id == reusableID && model.search.isEmpty)
+        #expect(model.projects.first { $0.id == emptyID }?.prompt == "Keep this unsaved idea")
+
+        await model.importAttachments([.image(try DemoArtwork.image(index: 0), name: "Reference")])
+        let attachedID = try #require(model.currentReferences.first?.id)
+        await model.createProject()
+        #expect(model.selectedProjectID != reusableID && model.projects.count == 3)
+        #expect(model.projects.first { $0.id == reusableID }?.referenceIDs == [attachedID])
+        let renamed = try #require(model.project)
+        await model.rename(renamed, to: "Ideas for later")
+        await model.createProject()
+        #expect(model.selectedProjectID != renamed.id && model.projects.count == 4)
+        #expect(model.projects.first { $0.id == renamed.id }?.displayTitle == "Ideas for later")
+        #expect(model.errorMessage == nil)
+    }
+
     @Test func newConversationsStayFirstWhenBrowsingAndRefreshing() async throws {
         let fixture = try ConversationFixture()
         let model = fixture.model

@@ -6,6 +6,7 @@ struct PromptEditor: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
     let focusID: UUID?
+    var focusRequest: UUID? = nil
     let onAttachments: ([ReferenceAttachment]) -> Void
     let onError: (Error) -> Void
     let onSubmit: () -> Void
@@ -51,8 +52,9 @@ struct PromptEditor: NSViewRepresentable {
             editor.string = text
             editor.setSelectedRange(NSRange(location: min(selected.location, (text as NSString).length), length: 0))
         }
-        if context.coordinator.focusID != focusID {
+        if context.coordinator.focusID != focusID || context.coordinator.focusRequest != focusRequest {
             context.coordinator.focusID = focusID
+            context.coordinator.focusRequest = focusRequest
             if focusID != nil {
                 DispatchQueue.main.async { [weak editor] in
                     guard let editor else { return }
@@ -83,6 +85,7 @@ struct PromptEditor: NSViewRepresentable {
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: PromptEditor
         var focusID: UUID?
+        var focusRequest: UUID?
         init(_ parent: PromptEditor) { self.parent = parent }
         func textDidChange(_ notification: Notification) {
             if let editor = notification.object as? NSTextView { parent.text = editor.string }

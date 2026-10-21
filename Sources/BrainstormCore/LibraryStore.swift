@@ -46,6 +46,25 @@ public actor LibraryStore {
         return LibrarySnapshot(projects: projects, batches: batches, assets: assets)
     }
 
+    /// Keep one unused draft. Any history, image, reference, or intentional name makes it nonempty.
+    public func consolidateEmptyDrafts(preferredID: UUID? = nil) throws -> Project? {
+        try db.transaction {
+            let drafts = try db.execute("""
+                SELECT * FROM projects WHERE title_mode='automatic' AND suggested_title IS NULL
+                AND parent_asset_id IS NULL
+                AND NOT EXISTS (SELECT 1 FROM batches WHERE project_id=projects.id)
+                AND NOT EXISTS (SELECT 1 FROM assets WHERE project_id=projects.id)
+                AND NOT EXISTS (SELECT 1 FROM project_references WHERE project_id=projects.id)
+                ORDER BY updated_at DESC, created_at DESC
+                """).map(project).filter { $0.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            guard let retained = drafts.first(where: { $0.id == preferredID }) ?? drafts.first else { return nil }
+            for draft in drafts where draft.id != retained.id {
+                try db.execute("DELETE FROM projects WHERE id=?", [.id(draft.id)])
+            }
+            return retained
+        }
+    }
+
     public func saveProject(_ value: Project) throws {
         try db.transaction {
             try db.execute("""

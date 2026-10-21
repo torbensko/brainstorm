@@ -32,6 +32,7 @@ struct ComposerView: View {
             }
             VStack(alignment: .leading, spacing: 14) {
                 PromptEditor(text: $model.prompt, placeholder: placeholder, focusID: model.parentAssetID ?? model.selectedProjectID,
+                             focusRequest: model.composerFocusRequest,
                              onAttachments: { attachments in Task { await model.importAttachments(attachments) } },
                              onError: { model.errorMessage = $0.localizedDescription },
                              onSubmit: { Task { await model.generate() } })

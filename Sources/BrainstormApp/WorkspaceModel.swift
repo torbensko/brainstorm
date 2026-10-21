@@ -9,6 +9,7 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var batches: [GenerationBatch] = []
     @Published private(set) var assets: [UUID: Asset] = [:]
     @Published private(set) var selectedProjectID: UUID?
+    @Published private(set) var composerFocusRequest = UUID()
     @Published var prompt = "" { didSet { scheduleSave() } }
     @Published private(set) var referenceIDs: [UUID] = []
     @Published private(set) var parentAssetID: UUID?
@@ -118,8 +119,9 @@ final class WorkspaceModel: ObservableObject {
             let savedConcurrency = preferences.integer(forKey: preferenceKey("concurrency"))
             if (1...6).contains(savedConcurrency) { concurrency = savedConcurrency }
             await queue.setConcurrency(concurrency)
-            try await reload()
             let savedID = preferences.string(forKey: isDemo ? "demoSelectedProject" : "selectedProject").flatMap(UUID.init(uuidString:))
+            _ = try await library.consolidateEmptyDrafts(preferredID: savedID)
+            try await reload()
             restore(projects.first { $0.id == savedID } ?? projects.first)
             isLoading = false
             await refreshKeys()
@@ -225,12 +227,16 @@ final class WorkspaceModel: ObservableObject {
     }
     func createProject(prompt newPrompt: String = "", references: [Asset] = []) async {
         guard !isImporting, !isSubmitting else { return }
+        navigationRevision += 1
         isSubmitting = true
         defer { isSubmitting = false }
         do {
             try await saveDraft()
             guard let library, let assetStore else { return }
-            var value = Project(title: PromptBuilder.title(from: newPrompt), prompt: newPrompt)
+            var value = try await library.consolidateEmptyDrafts(preferredID: selectedProjectID) ?? Project()
+            value.prompt = newPrompt
+            value.updateAutomaticTitle()
+            value.updatedAt = .now
             try await library.saveProject(value)
             for reference in references {
                 let copied = try await assetStore.importFile(assetStore.url(for: reference), projectID: value.id, name: reference.name)
@@ -241,6 +247,7 @@ final class WorkspaceModel: ObservableObject {
             try await reload()
             restore(value)
             search = ""
+            composerFocusRequest = UUID()
         } catch { errorMessage = error.localizedDescription }
     }
     func generate() async {
