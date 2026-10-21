@@ -37,12 +37,9 @@ struct WorkspaceView: View {
                         }
                         if model.projectBatches.isEmpty {
                             Spacer(minLength: 36)
-                            HStack(spacing: 16) {
-                                Image(nsImage: NSApplication.shared.applicationIconImage)
-                                    .resizable().scaledToFit().frame(width: 54, height: 54)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12)).accessibilityLabel("Brainstorm logo")
-                                Text("What shall we explore?").font(.system(size: 34, weight: .regular, design: .serif))
-                            }.padding(.bottom, 20)
+                            Text("What shall we explore?")
+                                .font(.system(size: 34, weight: .regular, design: .serif))
+                                .padding(.bottom, 20)
                             ComposerView(model: model).frame(maxWidth: 1000)
                             Text("One idea, a few different directions.").font(.subheadline).foregroundStyle(.tertiary).padding(.top, 6)
                             Spacer(minLength: 36)
@@ -69,9 +66,14 @@ struct WorkspaceView: View {
                     .navigationTitle("")
                     .toolbar {
                         ToolbarItem(placement: .principal) {
-                            Text(model.project?.title ?? "New conversation")
-                                .font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.tail)
-                                .help(model.project?.title ?? "New conversation")
+                            HStack(spacing: 9) {
+                                Image(nsImage: NSApplication.shared.applicationIconImage)
+                                    .resizable().scaledToFit().frame(width: 26, height: 26)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6)).accessibilityLabel("Brainstorm logo")
+                                Text(model.project?.title ?? "New conversation")
+                                    .font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.tail)
+                                    .help(model.project?.title ?? "New conversation")
+                            }
                         }
                         ToolbarItem(placement: .primaryAction) {
                             HStack(spacing: 12) {

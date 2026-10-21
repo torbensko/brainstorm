@@ -1,7 +1,7 @@
 ---
 name: Native Brainstorm architecture
 description: Concepts, image revisions, provider boundaries, and durable local generation.
-version: 3
+version: 4
 match: Native macOS app state, storage, image generation, provider adapters, packaging, and tests.
 matchCriteria:
   globs:
@@ -17,7 +17,7 @@ A concept owns a draft and a sequence of generation sets. Each set captures its 
 
 The SwiftUI app owns navigation and editable drafts. BrainstormCore owns persistence, files, credentials, provider calls, and generation scheduling. The app observes queue events and reloads metadata; previews load separately. Provider calls never depend on an active view or selected concept.
 
-The interface presents concepts as conversations. The sidebar provides search and navigation; the toolbar shows the conversation title. A new conversation centers the composer with the existing app logo above it, then moves the composer below the image history after generation. Shared pill controls give model, shape, quality, and image count a consistent treatment and wrap when space is limited. Subscription mode omits quality because Codex manages it.
+The interface presents concepts as conversations. The sidebar provides search and navigation; the toolbar shows the existing app logo beside the conversation title. A new conversation centers the composer under an opening prompt, then moves the composer below the image history after generation. Shared pill controls give model, shape, quality, and image count a consistent treatment and wrap when space is limited. Subscription mode omits quality because Codex manages it.
 
 SQLite stores normalized metadata and explicit foreign keys. Image bytes are ordinary files, with smaller previews for the grid. Imports copy images into the library, orient and normalize them to PNG, and strip incidental metadata. References are ordered: the selected image comes first, supplementary attachments follow. A library lock prevents two app processes from recovering or scheduling the same work simultaneously.
 
