@@ -18,8 +18,8 @@ public struct ImageOutput: Sendable {
 }
 
 public protocol ImageProvider: Sendable {
-    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, apiKey: String) async throws -> ImageOutput
-    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], apiKey: String) async throws -> String
+    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, credential: ProviderCredential) async throws -> ImageOutput
+    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], credential: ProviderCredential) async throws -> String
 }
 
 public struct HTTPResult: Sendable {
@@ -101,7 +101,7 @@ public struct ProviderClient: Sendable {
 public struct OpenAIProvider: ImageProvider {
     private let client: ProviderClient
     public init(client: ProviderClient = ProviderClient()) { self.client = client }
-    public func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, apiKey: String) async throws -> ImageOutput {
+    public func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, credential: ProviderCredential) async throws -> ImageOutput {
         struct ImageInput: Encodable, Sendable { let image_url: String }
         struct Request: Encodable, Sendable {
             let model: String; let prompt: String; let size: String; let quality: String
@@ -117,14 +117,14 @@ public struct OpenAIProvider: ImageProvider {
         let body = Request(model: settings.model, prompt: prompt, size: settings.shape.openAISize,
                            quality: settings.quality.openAIValue, images: references.isEmpty ? nil : references.map { ImageInput(image_url: $0.dataURL) })
         let path = references.isEmpty ? "generations" : "edits"
-        let response = try await client.post(body, to: URL(string: "https://api.openai.com/v1/images/\(path)")!, apiKey: apiKey, provider: .openAI)
+        let response = try await client.post(body, to: URL(string: "https://api.openai.com/v1/images/\(path)")!, apiKey: try credential.apiKey, provider: .openAI)
         let decoded = try JSONDecoder().decode(Response.self, from: response.data)
         guard let base64 = decoded.data.first?.b64_json, let image = Data(base64Encoded: base64), !image.isEmpty else {
             throw BrainstormError.response("OpenAI returned no image. Try a more specific prompt.")
         }
         return ImageOutput(data: image, requestID: response.requestID, inputTokens: decoded.usage?.input_tokens, outputTokens: decoded.usage?.output_tokens)
     }
-    public func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], apiKey: String) async throws -> String {
+    public func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], credential: ProviderCredential) async throws -> String {
         struct Part: Encodable, Sendable { let type: String; var text: String?; var image_url: String? }
         struct Message: Encodable, Sendable { let role = "user"; let content: [Part] }
         struct Request: Encodable, Sendable { let model = ProviderID.openAI.textModel; let instructions: String; let input: [Message]; let store = false }
@@ -138,7 +138,7 @@ public struct OpenAIProvider: ImageProvider {
         var content = [Part(type: "input_text", text: "Current brief:\n\(prompt)\n\nRequested revision:\n\(direction)")]
         content += references.map { Part(type: "input_image", image_url: $0.dataURL) }
         let response = try await client.post(Request(instructions: refinementInstructions, input: [Message(content: content)]),
-                                             to: URL(string: "https://api.openai.com/v1/responses")!, apiKey: apiKey, provider: .openAI)
+                                             to: URL(string: "https://api.openai.com/v1/responses")!, apiKey: try credential.apiKey, provider: .openAI)
         let decoded = try JSONDecoder().decode(Response.self, from: response.data)
         let result = decoded.output.filter { $0.type == "message" }.flatMap { $0.content ?? [] }
             .filter { $0.type == "output_text" }.compactMap(\.text).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -174,12 +174,12 @@ public struct GeminiProvider: ImageProvider {
         struct Usage: Decodable { let promptTokenCount: Int?; let candidatesTokenCount: Int? }
         let candidates: [Candidate]?; let promptFeedback: Feedback?; let usageMetadata: Usage?
     }
-    public func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, apiKey: String) async throws -> ImageOutput {
+    public func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, credential: ProviderCredential) async throws -> ImageOutput {
         try settings.validate()
         guard references.count <= ProviderID.gemini.maximumReferences else { throw BrainstormError.invalid("Gemini supports at most 14 reference images.") }
         let body = Request(contents: [Content(role: "user", parts: parts(prompt, references))],
                            generationConfig: .init(responseModalities: ["TEXT", "IMAGE"], imageConfig: .init(aspectRatio: settings.shape.aspectRatio, imageSize: settings.quality.geminiSize)))
-        let response = try await send(body, model: settings.model, apiKey: apiKey)
+        let response = try await send(body, model: settings.model, apiKey: try credential.apiKey)
         let decoded = try JSONDecoder().decode(Response.self, from: response.data)
         let finalParts = decoded.candidates?.first?.content?.parts.filter { $0.thought != true } ?? []
         guard let imagePart = finalParts.last(where: { $0.inlineData?.mimeType.hasPrefix("image/") == true }),
@@ -190,11 +190,11 @@ public struct GeminiProvider: ImageProvider {
         return ImageOutput(data: image, requestID: response.requestID,
                            inputTokens: decoded.usageMetadata?.promptTokenCount, outputTokens: decoded.usageMetadata?.candidatesTokenCount)
     }
-    public func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], apiKey: String) async throws -> String {
+    public func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], credential: ProviderCredential) async throws -> String {
         let body = Request(contents: [Content(role: "user", parts: parts("Current brief:\n\(prompt)\n\nRequested revision:\n\(direction)", references))],
                            generationConfig: .init(responseModalities: ["TEXT"]),
                            systemInstruction: Content(parts: [Part(text: refinementInstructions)]))
-        let response = try await send(body, model: ProviderID.gemini.textModel, apiKey: apiKey)
+        let response = try await send(body, model: ProviderID.gemini.textModel, apiKey: try credential.apiKey)
         let decoded = try JSONDecoder().decode(Response.self, from: response.data)
         let text = decoded.candidates?.first?.content?.parts.filter { $0.thought != true }.compactMap(\.text).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !text.isEmpty else { throw BrainstormError.response("Gemini returned no revised prompt.") }

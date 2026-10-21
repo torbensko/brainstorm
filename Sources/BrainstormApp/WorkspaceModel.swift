@@ -26,6 +26,9 @@ final class WorkspaceModel: ObservableObject {
     @Published var isSubmitting = false
     @Published var isLoading = true
     @Published var hasKeys: Set<ProviderID> = []
+    @Published var subscriptionStatus: SubscriptionStatus?
+    @Published var subscriptionMessage: String?
+    @Published var signingIn = false
     @Published var showRefinePrompt = false
     @Published var showFileImporter = false
     @Published var renameProject: Project?
@@ -36,6 +39,7 @@ final class WorkspaceModel: ObservableObject {
     private(set) var assetStore: AssetStore?
     private(set) var providers = ProviderRegistry()
     private var credentials: (any CredentialStore)?
+    private var subscription: CodexSubscription?
     private var queue: GenerationQueue?
     private var started = false
     private var libraryLock: LibraryLock?
@@ -68,9 +72,14 @@ final class WorkspaceModel: ObservableObject {
             let assetStore = try AssetStore(root: root.appendingPathComponent("Images", isDirectory: true))
             self.library = library; self.assetStore = assetStore
             if isDemo {
-                providers = ProviderRegistry(providers: [.openAI: DemoProvider(), .gemini: DemoProvider()])
+                providers = ProviderRegistry(providers: [.chatGPT: DemoProvider(), .openAI: DemoProvider(), .gemini: DemoProvider()])
                 credentials = DemoCredentials()
-            } else { credentials = keychain }
+            } else {
+                let subscription = CodexSubscription(workRoot: root.appendingPathComponent("Requests"))
+                self.subscription = subscription
+                providers = ProviderRegistry(providers: [.chatGPT: subscription, .openAI: OpenAIProvider(), .gemini: GeminiProvider()])
+                credentials = WorkspaceCredentials(keychain: keychain, subscription: subscription)
+            }
             guard let credentials else { throw BrainstormError.storage("Credential storage is unavailable.") }
             let queue = GenerationQueue(library: library, assets: assetStore, credentials: credentials, providers: providers)
             self.queue = queue
@@ -78,6 +87,10 @@ final class WorkspaceModel: ObservableObject {
             if let data = UserDefaults.standard.data(forKey: preferenceKey("generationSettings")) {
                 settings = try JSONDecoder().decode(GenerationSettings.self, from: data)
                 try settings.validate()
+            }
+            if !UserDefaults.standard.bool(forKey: preferenceKey("subscriptionDefaultApplied")) {
+                settings = GenerationSettings()
+                UserDefaults.standard.set(true, forKey: preferenceKey("subscriptionDefaultApplied"))
             }
             let savedCount = UserDefaults.standard.integer(forKey: preferenceKey("generationCount"))
             if (1...16).contains(savedCount) { count = savedCount }
@@ -113,10 +126,43 @@ final class WorkspaceModel: ObservableObject {
         if isDemo { hasKeys = Set(ProviderID.allCases); return }
         do {
             var available: Set<ProviderID> = []
-            for provider in ProviderID.allCases where try await keychain.hasKey(for: provider) { available.insert(provider) }
+            for provider in ProviderID.allCases where provider != .chatGPT {
+                if try await keychain.hasKey(for: provider) { available.insert(provider) }
+            }
             hasKeys = available
         } catch { errorMessage = error.localizedDescription }
+        await refreshSubscription()
     }
+    func refreshSubscription() async {
+        guard let subscription else { return }
+        do {
+            let status = try await subscription.status()
+            subscriptionStatus = status
+            if status.connected && status.imageGeneration { hasKeys.insert(.chatGPT); subscriptionMessage = nil }
+            else {
+                hasKeys.remove(.chatGPT)
+                subscriptionMessage = status.connected ? "Image generation is unavailable. Update ChatGPT or Codex and reconnect." : "Sign in with your ChatGPT subscription to begin."
+            }
+        } catch { hasKeys.remove(.chatGPT); subscriptionStatus = nil; subscriptionMessage = error.localizedDescription }
+    }
+    func signInWithChatGPT() async {
+        guard let subscription, !signingIn else { return }
+        signingIn = true
+        defer { signingIn = false }
+        do {
+            let url = try await subscription.beginSignIn()
+            guard NSWorkspace.shared.open(url) else { throw BrainstormError.invalid("Could not open the sign-in page in your browser.") }
+            subscriptionMessage = "Finish signing in in your browser."
+            for _ in 0..<120 {
+                try await Task.sleep(for: .seconds(2))
+                let status = try await subscription.status()
+                if status.connected { await refreshSubscription(); return }
+            }
+            try await subscription.cancelSignIn()
+            subscriptionMessage = "Sign-in timed out. Try again when you are ready."
+        } catch { subscriptionMessage = error.localizedDescription }
+    }
+    func shutdown() async { await subscription?.shutdown() }
     func selectProject(_ id: UUID?) async {
         guard id != selectedProjectID, !isImporting, !isSubmitting else { return }
         navigationRevision += 1
@@ -261,11 +307,11 @@ final class WorkspaceModel: ObservableObject {
     }
     func refinePrompt(_ original: String, direction: String, referenceAssets: [Asset], providerID: ProviderID) async throws -> String {
         guard let credentials, let assetStore else { throw BrainstormError.storage("Library unavailable.") }
-        let key = try await credentials.key(for: providerID)
+        let credential = try await credentials.credential(for: providerID)
         let provider = try providers.provider(providerID)
         var references: [ImageReference] = []
         for asset in referenceAssets { references.append(try await assetStore.reference(asset)) }
-        return try await provider.refinePrompt(original, direction: direction, references: references, apiKey: key)
+        return try await provider.refinePrompt(original, direction: direction, references: references, credential: credential)
     }
     func assetURL(_ asset: Asset, thumbnail: Bool = false) -> URL? { assetStore?.url(for: asset, thumbnail: thumbnail) }
     func export(_ asset: Asset) {

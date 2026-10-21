@@ -6,17 +6,17 @@ import UniformTypeIdentifiers
 import BrainstormCore
 
 struct DemoCredentials: CredentialStore {
-    func key(for provider: ProviderID) async throws -> String { "demo-no-network" }
+    func credential(for provider: ProviderID) async throws -> ProviderCredential { .apiKey("demo-no-network") }
 }
 
 actor DemoProvider: ImageProvider {
     private var sequence = 0
-    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, apiKey: String) async throws -> ImageOutput {
+    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, credential: ProviderCredential) async throws -> ImageOutput {
         let index = sequence; sequence += 1
         try await Task.sleep(for: .milliseconds(500 + (index % 3) * 350))
         return ImageOutput(data: try DemoArtwork.image(index: index, refinement: !references.isEmpty))
     }
-    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], apiKey: String) async throws -> String {
+    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], credential: ProviderCredential) async throws -> String {
         try await Task.sleep(for: .milliseconds(600))
         return "Create a minimal coastal travel poster with warm ivory paper, a terracotta sun, deep green shapes, and generous negative space. Use the exact heading ‘A slower kind of summer’. Explore a calm, geometric composition.\n\nAdditional direction: \(direction)"
     }

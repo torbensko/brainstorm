@@ -26,7 +26,7 @@ public actor GenerationQueue {
         continuation.yield(.changed)
     }
     public func submit(_ batch: GenerationBatch) async throws {
-        _ = try await credentials.key(for: batch.settings.provider)
+        _ = try await credentials.credential(for: batch.settings.provider)
         _ = try providers.provider(batch.settings.provider)
         try await library.addBatch(batch)
         continuation.yield(.changed)
@@ -69,11 +69,11 @@ public actor GenerationQueue {
         do {
             try Task.checkCancellation()
             let provider = try providers.provider(batch.settings.provider)
-            let key = try await credentials.key(for: batch.settings.provider)
+            let credential = try await credentials.credential(for: batch.settings.provider)
             let storedReferences = try await library.assets(ids: batch.referenceIDs)
             var references: [ImageReference] = []
             for asset in storedReferences { references.append(try await assets.reference(asset)) }
-            let output = try await request(provider: provider, batch: batch, job: job, references: references, key: key)
+            let output = try await request(provider: provider, batch: batch, job: job, references: references, credential: credential)
             try Task.checkCancellation()
             let asset = try await assets.save(data: output.data, projectID: batch.projectID,
                                                name: "\(PromptBuilder.title(from: batch.prompt)) — \(job.position + 1).png")
@@ -99,12 +99,12 @@ public actor GenerationQueue {
         await pump()
     }
     private func request(provider: any ImageProvider, batch: GenerationBatch, job: GenerationJob,
-                         references: [ImageReference], key: String) async throws -> ImageOutput {
+                         references: [ImageReference], credential: ProviderCredential) async throws -> ImageOutput {
         var retries = 0
         while true {
             try Task.checkCancellation()
             do {
-                return try await provider.generate(prompt: batch.resolvedPrompt, references: references, settings: batch.settings, apiKey: key)
+                return try await provider.generate(prompt: batch.resolvedPrompt, references: references, settings: batch.settings, credential: credential)
             } catch let error as ProviderHTTPError where error.mayRetry && retries < 2 {
                 let delay = max(1, error.retryAfter ?? (pow(2, Double(retries + 1)) + Double.random(in: 0...1)))
                 // Long rate limits and ambiguous failures require an explicit retry, avoiding duplicate spend.

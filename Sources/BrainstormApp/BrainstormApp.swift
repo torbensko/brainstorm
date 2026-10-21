@@ -38,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let workspace else { return .terminateNow }
         Task {
-            do { try await workspace.saveDraft(); sender.reply(toApplicationShouldTerminate: true) }
+            do { try await workspace.saveDraft(); await workspace.shutdown(); sender.reply(toApplicationShouldTerminate: true) }
             catch { workspace.errorMessage = "Could not save your draft: \(error.localizedDescription)"; sender.reply(toApplicationShouldTerminate: false) }
         }
         return .terminateLater

@@ -1,11 +1,12 @@
 import Foundation
 
 public enum ProviderID: String, Codable, CaseIterable, Sendable, Identifiable {
-    case openAI, gemini
+    case chatGPT, openAI, gemini
     public var id: String { rawValue }
-    public var title: String { self == .openAI ? "OpenAI" : "Google Gemini" }
+    public var title: String { switch self { case .chatGPT: "ChatGPT subscription"; case .openAI: "OpenAI API"; case .gemini: "Google Gemini" } }
     public var models: [ImageModel] {
         switch self {
+        case .chatGPT: [ImageModel(id: "codex-native-image", title: "ChatGPT subscription")]
         case .openAI: [
             ImageModel(id: "gpt-image-2.5-flare", title: "GPT Image 2.5 · Flare"),
             ImageModel(id: "gpt-image-2.5-sunburst", title: "GPT Image 2.5 · Sunburst"),
@@ -18,7 +19,7 @@ public enum ProviderID: String, Codable, CaseIterable, Sendable, Identifiable {
         }
     }
     public var textModel: String { self == .openAI ? "gpt-6-luna" : "gemini-2.5-flash" }
-    public var maximumReferences: Int { self == .openAI ? 16 : 14 }
+    public var maximumReferences: Int { self == .gemini ? 14 : 16 }
 }
 
 public struct ImageModel: Identifiable, Sendable, Equatable {
@@ -55,7 +56,7 @@ public struct GenerationSettings: Codable, Equatable, Sendable {
     public var model: String
     public var shape: ImageShape
     public var quality: ImageQuality
-    public init(provider: ProviderID = .openAI, model: String = "gpt-image-2.5-flare",
+    public init(provider: ProviderID = .chatGPT, model: String = "codex-native-image",
                 shape: ImageShape = .square, quality: ImageQuality = .draft) {
         self.provider = provider; self.model = model; self.shape = shape; self.quality = quality
     }

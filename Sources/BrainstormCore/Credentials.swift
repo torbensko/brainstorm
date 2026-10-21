@@ -1,11 +1,38 @@
 import Foundation
 import Security
 
-public protocol CredentialStore: Sendable {
-    func key(for provider: ProviderID) async throws -> String
+public enum ProviderCredential: Sendable {
+    case apiKey(String), chatGPT
+    var apiKey: String {
+        get throws {
+            guard case .apiKey(let key) = self, !key.isEmpty else {
+                throw BrainstormError.invalid("This provider requires an API key. Subscription credentials cannot be used for API billing.")
+            }
+            return key
+        }
+    }
 }
 
-public actor KeychainCredentials: CredentialStore {
+public protocol CredentialStore: Sendable {
+    func credential(for provider: ProviderID) async throws -> ProviderCredential
+}
+
+public struct WorkspaceCredentials: CredentialStore {
+    let keychain: KeychainCredentials
+    let subscription: CodexSubscription
+    public init(keychain: KeychainCredentials, subscription: CodexSubscription) {
+        self.keychain = keychain; self.subscription = subscription
+    }
+    public func credential(for provider: ProviderID) async throws -> ProviderCredential {
+        if provider == .chatGPT {
+            try await subscription.requireSubscription()
+            return .chatGPT
+        }
+        return .apiKey(try await keychain.key(for: provider))
+    }
+}
+
+public actor KeychainCredentials {
     private let service = "app.brainstorm.native.api-keys"
     public init() {}
     public func key(for provider: ProviderID) throws -> String {

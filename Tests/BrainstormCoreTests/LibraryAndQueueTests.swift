@@ -19,7 +19,7 @@ struct Fixture: Sendable {
         try await library.saveProject(project)
         let id = UUID()
         return GenerationBatch(id: id, projectID: project.id, prompt: project.prompt, resolvedPrompt: project.prompt,
-                               settings: GenerationSettings(), jobs: (0..<count).map { GenerationJob(batchID: id, position: $0) })
+                               settings: GenerationSettings(provider: .openAI, model: "gpt-image-2.5-flare"), jobs: (0..<count).map { GenerationJob(batchID: id, position: $0) })
     }
 }
 
@@ -36,7 +36,7 @@ func testPNG() throws -> Data {
 }
 
 struct TestCredentials: CredentialStore {
-    func key(for provider: ProviderID) async throws -> String { "test-key" }
+    func credential(for provider: ProviderID) async throws -> ProviderCredential { .apiKey("test-key") }
 }
 
 actor RecordingProvider: ImageProvider {
@@ -50,7 +50,7 @@ actor RecordingProvider: ImageProvider {
     init(delay: Duration = .milliseconds(60), failFirst: Bool = false, ignoreCancellation: Bool = false) {
         self.delay = delay; self.failFirst = failFirst; self.ignoreCancellation = ignoreCancellation
     }
-    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, apiKey: String) async throws -> ImageOutput {
+    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, credential: ProviderCredential) async throws -> ImageOutput {
         calls += 1; let call = calls
         active += 1; maximumActive = max(maximumActive, active); referenceCounts.append(references.count)
         defer { active -= 1 }
@@ -58,7 +58,7 @@ actor RecordingProvider: ImageProvider {
         if failFirst && call == 1 { throw BrainstormError.response("One intentional failure") }
         return ImageOutput(data: try testPNG(), requestID: "test-\(call)", inputTokens: 10, outputTokens: 100)
     }
-    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], apiKey: String) async throws -> String { "Refined: \(prompt)" }
+    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], credential: ProviderCredential) async throws -> String { "Refined: \(prompt)" }
 }
 
 func waitUntil(_ condition: @escaping @Sendable () async throws -> Bool) async throws {
@@ -144,7 +144,7 @@ func waitUntil(_ condition: @escaping @Sendable () async throws -> Bool) async t
     try await fixture.library.addAsset(first); try await fixture.library.addAsset(second)
     let id = UUID()
     let batch = GenerationBatch(id: id, projectID: initial.projectID, prompt: "Make it green", resolvedPrompt: "Make it green",
-                                parentAssetID: second.id, referenceIDs: [second.id, first.id], settings: GenerationSettings(), jobs: [GenerationJob(batchID: id, position: 0)])
+                                parentAssetID: second.id, referenceIDs: [second.id, first.id], settings: GenerationSettings(provider: .openAI, model: "gpt-image-2.5-flare"), jobs: [GenerationJob(batchID: id, position: 0)])
     try await fixture.library.addBatch(batch)
     #expect(try await fixture.library.batch(id: id)?.referenceIDs == [second.id, first.id])
     let foreign = Project(title: "Another concept", referenceIDs: [first.id])
@@ -162,7 +162,7 @@ func waitUntil(_ condition: @escaping @Sendable () async throws -> Bool) async t
     try await fixture.library.saveProject(project)
     let id = UUID()
     let edit = GenerationBatch(id: id, projectID: project.id, prompt: "Edit", resolvedPrompt: "Edit", parentAssetID: asset.id,
-                               referenceIDs: [asset.id], settings: GenerationSettings(), jobs: [GenerationJob(batchID: id, position: 0)])
+                               referenceIDs: [asset.id], settings: GenerationSettings(provider: .openAI, model: "gpt-image-2.5-flare"), jobs: [GenerationJob(batchID: id, position: 0)])
     try await fixture.library.addBatch(edit)
     try await fixture.library.deleteProject(project.id)
     let snapshot = try await fixture.library.snapshot()
@@ -205,12 +205,12 @@ func waitUntil(_ condition: @escaping @Sendable () async throws -> Bool) async t
 
 actor RateLimitedProvider: ImageProvider {
     private(set) var calls = 0
-    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, apiKey: String) async throws -> ImageOutput {
+    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, credential: ProviderCredential) async throws -> ImageOutput {
         calls += 1
         if calls == 1 { throw ProviderHTTPError(status: 429, message: "Rate limited", retryAfter: 0, mayRetry: true) }
         return ImageOutput(data: try testPNG())
     }
-    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], apiKey: String) async throws -> String { prompt }
+    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], credential: ProviderCredential) async throws -> String { prompt }
 }
 
 @Test func rateLimitedJobRetriesWithoutDuplicatingItsSlot() async throws {

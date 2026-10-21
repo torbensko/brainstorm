@@ -3,70 +3,93 @@ import BrainstormCore
 
 struct SettingsView: View {
     @ObservedObject var model: WorkspaceModel
-    @State private var provider = ProviderID.openAI
+    @State private var provider = ProviderID.chatGPT
     @State private var key = ""
     @State private var message: String?
     @State private var saving = false
     var body: some View {
         Form {
-            Section {
-                Text("Your studio, your services.").font(.system(size: 24, weight: .medium, design: .serif)).padding(.vertical, 4)
-                Text("Images and prompts are saved on this Mac. Generation uses your own API account.")
-                    .foregroundStyle(.secondary)
-            }
             Section("Service accounts") {
-                Picker("Provider", selection: $provider) {
+                Picker("Connection", selection: $provider) {
                     ForEach(ProviderID.allCases) { provider in Text(provider.title).tag(provider) }
                 }
-                HStack {
-                    Label(model.hasKeys.contains(provider) ? "API key saved in Keychain" : "No API key saved", systemImage: model.hasKeys.contains(provider) ? "checkmark.shield" : "key")
-                        .foregroundStyle(model.hasKeys.contains(provider) ? StudioStyle.accent : .secondary)
-                    Spacer()
-                    Link("Get an API key ↗", destination: URL(string: provider == .openAI ? "https://platform.openai.com/api-keys" : "https://aistudio.google.com/apikey")!)
-                }
-                SecureField(model.hasKeys.contains(provider) ? "Replace API key" : "API key", text: $key)
-                HStack {
-                    Button("Save Key") {
-                        saving = true; message = nil
-                        let selected = provider; let value = key
-                        Task {
-                            do {
-                                try await model.keychain.save(value, for: selected)
-                                key = ""; message = "Saved securely in Keychain."
-                                await model.refreshKeys()
-                            } catch { message = error.localizedDescription }
-                            saving = false
-                        }
-                    }.disabled(key.isEmpty || saving || model.isDemo)
-                    if model.hasKeys.contains(provider) && !model.isDemo {
-                        Button("Remove Key", role: .destructive) {
-                            Task {
-                                do { try await model.keychain.remove(for: provider); await model.refreshKeys(); message = "Key removed." }
-                                catch { message = error.localizedDescription }
-                            }
-                        }
-                    }
-                    Spacer()
-                }
-                if let message { Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
-                if provider == .openAI {
-                    Text("API image generation is billed separately from your ChatGPT subscription.").font(.caption).foregroundStyle(.secondary)
-                }
+                if provider == .chatGPT { subscription }
+                else { apiAccount }
             }
             Section("Generation") {
                 Stepper("Concurrent requests: \(model.concurrency)", value: $model.concurrency, in: 1...6)
-                Text("Larger sets wait in the queue. Reduce this if your account frequently reaches a rate limit.").font(.caption).foregroundStyle(.secondary)
-                Text("Interrupted requests stay available for manual retry. Cancelling stops this app’s request; a provider may already have started processing it.")
+                Text("Larger sets wait in the queue. Each image uses its own request, so you can retry individual images.").font(.caption).foregroundStyle(.secondary)
+                Text("Interrupted requests stay available for manual retry. Cancelling stops this app’s request; the service may already have started processing it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Library") {
-                LabeledContent("Location", value: "Application Support / Brainstorm Native")
                 Button("Show Library Folder") { model.revealLibrary() }
-                Text("Back up this folder to preserve concepts, references, and original images. API keys remain in Keychain.").font(.caption).foregroundStyle(.secondary)
+                Text("Concepts, references, and images stay on this Mac. Back up the library folder to keep a copy. API keys stay in Keychain; ChatGPT sign-in is managed by Codex.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped).frame(width: 580, height: 620)
         .onChange(of: provider) { _, _ in key = ""; message = nil }
         .task { await model.refreshKeys() }
+    }
+    private var subscription: some View {
+        Group {
+            Label(model.hasKeys.contains(.chatGPT) ? "ChatGPT connected" : "Connect your ChatGPT account",
+                  systemImage: model.hasKeys.contains(.chatGPT) ? "checkmark.shield" : "person.crop.circle")
+                .foregroundStyle(model.hasKeys.contains(.chatGPT) ? StudioStyle.accent : .primary)
+            if let status = model.subscriptionStatus, status.connected {
+                if let label = status.accountLabel { Text(label).foregroundStyle(.secondary) }
+                if let plan = status.plan { Text("\(plan.capitalized) plan").font(.caption).foregroundStyle(.secondary) }
+            }
+            HStack {
+                if !model.hasKeys.contains(.chatGPT) {
+                    Button(model.signingIn ? "Waiting for sign-in…" : "Sign in with ChatGPT") {
+                        Task { await model.signInWithChatGPT() }
+                    }.disabled(model.signingIn || model.isDemo)
+                }
+                Button("Refresh Connection") { Task { await model.refreshSubscription() } }.disabled(model.isDemo)
+                Spacer()
+                Link("Manage usage ↗", destination: URL(string: "https://chatgpt.com/codex/settings/usage")!)
+            }
+            if let message = model.subscriptionMessage { Text(message).font(.caption).foregroundStyle(.secondary) }
+            Text("Uses your ChatGPT subscription through the Codex installation on this Mac. Your plan’s usage limits apply. Subscription mode never switches to API billing.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    private var apiAccount: some View {
+        Group {
+            HStack {
+                Label(model.hasKeys.contains(provider) ? "API key saved in Keychain" : "No API key saved", systemImage: "key")
+                Spacer()
+                Link("Get an API key ↗", destination: URL(string: provider == .openAI ? "https://platform.openai.com/api-keys" : "https://aistudio.google.com/apikey")!)
+            }
+            SecureField(model.hasKeys.contains(provider) ? "Replace API key" : "API key", text: $key)
+            HStack {
+                Button("Save Key") {
+                    saving = true; message = nil
+                    let selected = provider; let value = key
+                    Task {
+                        do {
+                            try await model.keychain.save(value, for: selected)
+                            key = ""; message = "Saved securely in Keychain."
+                            await model.refreshKeys()
+                        } catch { message = error.localizedDescription }
+                        saving = false
+                    }
+                }.disabled(key.isEmpty || saving || model.isDemo)
+                if model.hasKeys.contains(provider) && !model.isDemo {
+                    Button("Remove Key", role: .destructive) {
+                        Task {
+                            do { try await model.keychain.remove(for: provider); await model.refreshKeys(); message = "Key removed." }
+                            catch { message = error.localizedDescription }
+                        }
+                    }
+                }
+                Spacer()
+            }
+            if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
+            Text("Optional, separately billed API access. Select this service in the composer only when you want to use API billing.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
