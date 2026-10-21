@@ -13,3 +13,9 @@ out/
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+
+# Native macOS app
+.build/
+.swiftpm/
+*.xcuserstate
+xcuserdata/
