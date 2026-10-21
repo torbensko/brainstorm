@@ -17,7 +17,7 @@ struct ImageDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("A closer look").font(.headline)
-                    Text("\(asset.width) × \(asset.height) · \(batch?.settings.model ?? "Reference image")").font(.caption).foregroundStyle(.secondary)
+                    Text("\(asset.width) × \(asset.height) · \(batch?.settings.provider == .chatGPT ? "ChatGPT subscription" : (batch?.settings.model ?? "Reference image"))").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark") }.keyboardShortcut(.cancelAction).buttonStyle(.plain)

@@ -24,7 +24,7 @@ struct SettingsView: View {
             }
             Section("Library") {
                 Button("Show Library Folder") { model.revealLibrary() }
-                Text("Concepts, references, and images stay on this Mac. Back up the library folder to keep a copy. API keys stay in Keychain; ChatGPT sign-in is managed by Codex.")
+                Text("Conversations, references, and images stay on this Mac. Back up the library folder to keep a copy. API keys stay in Keychain; ChatGPT sign-in is managed by Codex.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

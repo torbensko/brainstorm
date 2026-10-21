@@ -22,7 +22,7 @@ struct PromptRefinementView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Give the idea another angle.").font(.system(size: 26, weight: .medium, design: .serif))
-                    Text("Refine the wording, then start a fresh concept. Your current exploration stays as it is.")
+                    Text("Refine the wording, then start a fresh conversation. Your current exploration stays as it is.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -57,7 +57,7 @@ struct PromptRefinementView: View {
                     TextEditor(text: $proposal).font(.system(size: 14)).scrollContentBackground(.hidden)
                         .padding(10).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
                         .frame(minHeight: 330).disabled(working)
-                    Text("\(references.count) reference image\(references.count == 1 ? "" : "s") will be copied to the new concept.")
+                    Text("\(references.count) reference image\(references.count == 1 ? "" : "s") will be copied to the new conversation.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -66,7 +66,7 @@ struct PromptRefinementView: View {
             HStack {
                 Button("Cancel") { task?.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Start New Concept") {
+                Button("Start New Conversation") {
                     Task { await model.createProject(prompt: proposal, references: references); dismiss() }
                 }
                 .buttonStyle(.borderedProminent).disabled(working || model.isSubmitting || proposal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
