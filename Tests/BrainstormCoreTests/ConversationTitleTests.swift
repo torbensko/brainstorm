@@ -40,6 +40,7 @@ import Testing
     _ = try LibraryStore(url: url)
     let db = try SQLiteConnection(url: url)
     try db.execute("ALTER TABLE projects DROP COLUMN title_mode")
+    try db.execute("ALTER TABLE projects DROP COLUMN suggested_title")
     try db.execute("PRAGMA user_version = 1")
     let prompt = "Show some of the ways I could style this room"
     for title in ["S", "Living room", "X"] {
@@ -54,4 +55,42 @@ import Testing
     #expect(projects.allSatisfy { $0.prompt == prompt })
     let reopened = try LibraryStore(url: url)
     #expect(try await reopened.snapshot().projects == projects)
+}
+
+@Test func suggestedNamesSurviveDraftSavesAndRespectManualRenames() async throws {
+    let fixture = try Fixture()
+    var project = Project(prompt: "Create a cat logo with four different styles")
+    project.updateAutomaticTitle()
+    try await fixture.library.saveProject(project)
+    try await fixture.library.suggestTitle("Four-style cat logo", for: project.id)
+    // This copy predates the generated name, as an in-flight draft save might.
+    project.prompt = "Make the cat friendlier"
+    try await fixture.library.saveProject(project)
+    try await fixture.library.suggestTitle("An unwanted second name", for: project.id)
+    let reopened = try LibraryStore(url: fixture.root.appendingPathComponent("library.sqlite"))
+    var saved = try #require(try await reopened.snapshot().projects.first)
+    #expect(saved.displayTitle == "Four-style cat logo")
+    #expect(saved.prompt == project.prompt)
+    saved.title = "Brainstorm icon"
+    saved.titleMode = .custom
+    try await reopened.saveProject(saved)
+    #expect(try await reopened.snapshot().projects.first?.displayTitle == "Brainstorm icon")
+
+    let renamed = Project(title: "My room", titleMode: .custom)
+    try await reopened.saveProject(renamed)
+    try await reopened.suggestTitle("Room styling ideas", for: renamed.id)
+    let untouched = try #require(try await reopened.snapshot().projects.first { $0.id == renamed.id })
+    #expect(untouched.displayTitle == "My room" && untouched.suggestedTitle == nil)
+}
+
+@Test func versionTwoLibraryGainsNamesWithoutChangingItsExistingConversations() async throws {
+    let fixture = try Fixture()
+    let project = Project(title: "Personal name", titleMode: .custom)
+    try await fixture.library.saveProject(project)
+    let before = try await fixture.library.snapshot().projects
+    let db = try SQLiteConnection(url: fixture.root.appendingPathComponent("library.sqlite"))
+    try db.execute("ALTER TABLE projects DROP COLUMN suggested_title")
+    try db.execute("PRAGMA user_version = 2")
+    let migrated = try LibraryStore(url: fixture.root.appendingPathComponent("library.sqlite"))
+    #expect(try await migrated.snapshot().projects == before)
 }

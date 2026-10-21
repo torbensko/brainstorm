@@ -6,7 +6,7 @@ public actor LibraryStore {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         db = try SQLiteConnection(url: url)
         let version = try db.execute("PRAGMA user_version").first?.int("user_version") ?? 0
-        guard version <= 2 else { throw BrainstormError.storage("This library needs a newer version of Brainstorm.") }
+        guard version <= 3 else { throw BrainstormError.storage("This library needs a newer version of Brainstorm.") }
         if version == 0 {
             try db.transaction {
                 for statement in Self.schema { try db.execute(statement) }
@@ -28,6 +28,13 @@ public actor LibraryStore {
                     }
                 }
                 try db.execute("PRAGMA user_version = 2")
+            }
+        }
+        if version < 3 {
+            try db.transaction {
+                try db.execute("ALTER TABLE projects ADD COLUMN suggested_title TEXT")
+                try db.execute("UPDATE projects SET title='New conversation' WHERE title_mode='automatic' AND title='Untitled concept' AND trim(prompt)='' AND NOT EXISTS (SELECT 1 FROM batches WHERE project_id=projects.id)")
+                try db.execute("PRAGMA user_version = 3")
             }
         }
     }
@@ -57,6 +64,16 @@ public actor LibraryStore {
 
     public func addAsset(_ value: Asset) throws {
         try addAssetRow(value)
+    }
+
+    /// Separate from draft saves so an in-flight autosave cannot replace a generated name.
+    public func suggestTitle(_ title: String, for projectID: UUID) throws {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, title.count <= 80, !title.contains(where: \.isNewline) else {
+            throw BrainstormError.invalid("The service returned an invalid conversation name.")
+        }
+        try db.execute("UPDATE projects SET suggested_title=? WHERE id=? AND title_mode='automatic' AND suggested_title IS NULL",
+                       [.text(title), .id(projectID)])
     }
 
     public func addBatch(_ value: GenerationBatch) throws {
@@ -172,7 +189,8 @@ public actor LibraryStore {
         guard let titleMode = ProjectTitleMode(rawValue: try row.string("title_mode")) else { throw BrainstormError.storage("Unknown conversation title mode.") }
         let references = try db.execute("SELECT asset_id FROM project_references WHERE project_id=? ORDER BY position", [.id(id)]).map { try $0.id("asset_id") }
         return try Project(id: id, title: row.string("title"), titleMode: titleMode, prompt: row.string("prompt"), parentAssetID: row.optionalID("parent_asset_id"),
-                           referenceIDs: references, createdAt: row.date("created_at"), updatedAt: row.date("updated_at"))
+                           referenceIDs: references, createdAt: row.date("created_at"), updatedAt: row.date("updated_at"),
+                           suggestedTitle: row.optionalString("suggested_title"))
     }
     private func asset(_ row: SQLRow) throws -> Asset {
         try Asset(id: row.id("id"), projectID: row.id("project_id"), name: row.string("name"), filename: row.string("filename"),

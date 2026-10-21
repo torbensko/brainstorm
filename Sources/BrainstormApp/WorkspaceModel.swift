@@ -46,6 +46,8 @@ final class WorkspaceModel: ObservableObject {
     private var restoring = false
     private var saveTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
+    private var titleTask: Task<Void, Never>?
+    private var attemptedTitleIDs: Set<UUID> = []
     private var navigationRevision = 0
     private(set) var libraryURL: URL?
     private let preferences: UserDefaults
@@ -64,7 +66,13 @@ final class WorkspaceModel: ObservableObject {
 
     var project: Project? { projects.first { $0.id == selectedProjectID } }
     var visibleProjects: [Project] {
-        search.isEmpty ? projects : projects.filter { $0.title.localizedCaseInsensitiveContains(search) || $0.prompt.localizedCaseInsensitiveContains(search) }
+        search.isEmpty ? projects : projects.filter { project in
+            project.displayTitle.localizedCaseInsensitiveContains(search) || project.prompt.localizedCaseInsensitiveContains(search) ||
+                batches.contains { $0.projectID == project.id && $0.prompt.localizedCaseInsensitiveContains(search) }
+        }
+    }
+    var conversationSummaries: [UUID: ConversationSummary] {
+        Dictionary(grouping: batches, by: \.projectID).mapValues { ConversationSummary(batches: $0, assets: assets) }
     }
     var projectBatches: [GenerationBatch] { batches.filter { $0.projectID == selectedProjectID } }
     var activeJobCount: Int { batches.flatMap(\.jobs).filter { $0.status.isActive }.count }
@@ -135,6 +143,31 @@ final class WorkspaceModel: ObservableObject {
         projects = snapshot.projects; batches = snapshot.batches
         assets = Dictionary(uniqueKeysWithValues: snapshot.assets.map { ($0.id, $0) })
     }
+
+    /// Names are optional metadata. Request each once, sequentially, without holding up image generation.
+    private func scheduleConversationTitles() {
+        guard titleTask == nil, !isDemo else { return }
+        titleTask = Task { [weak self] in
+            guard let self else { return }
+            defer { titleTask = nil }
+            while !Task.isCancelled {
+                guard let project = projects.first(where: { project in
+                    project.titleMode == .automatic && project.suggestedTitle == nil && !attemptedTitleIDs.contains(project.id) &&
+                        batches.first(where: { $0.projectID == project.id }).map { hasKeys.contains($0.settings.provider) } == true
+                }), let firstMessage = batches.first(where: { $0.projectID == project.id }), let library else { break }
+                attemptedTitleIDs.insert(project.id)
+                do {
+                    let name = try await refinePrompt(firstMessage.prompt,
+                        direction: "Condense this brief into a distinctive conversation name of 3–6 words, at most 60 characters. Name the subject and its distinguishing style or goal. Omit instructions like Create, Generate, or Show me. Return only the name on one line, without quotes, explanation, or a trailing period.",
+                        referenceAssets: [], providerID: firstMessage.settings.provider)
+                    try Task.checkCancellation()
+                    try await library.suggestTitle(name.trimmingCharacters(in: .whitespacesAndNewlines), for: project.id)
+                    try await reload()
+                } catch is CancellationError { break }
+                catch { NSLog("Brainstorm could not name conversation %@: %@", project.id.uuidString, error.localizedDescription) }
+            }
+        }
+    }
     func refreshKeys() async {
         if isDemo { hasKeys = Set(ProviderID.allCases); return }
         do {
@@ -145,6 +178,7 @@ final class WorkspaceModel: ObservableObject {
             hasKeys = available
         } catch { errorMessage = error.localizedDescription }
         await refreshSubscription()
+        scheduleConversationTitles()
     }
     func refreshSubscription() async {
         guard let subscription else { return }
@@ -175,7 +209,10 @@ final class WorkspaceModel: ObservableObject {
             subscriptionMessage = "Sign-in timed out. Try again when you are ready."
         } catch { subscriptionMessage = error.localizedDescription }
     }
-    func shutdown() async { await subscription?.shutdown() }
+    func shutdown() async {
+        titleTask?.cancel()
+        await subscription?.shutdown()
+    }
     func selectProject(_ id: UUID?) async {
         guard id != selectedProjectID, !isImporting, !isSubmitting else { return }
         navigationRevision += 1
@@ -232,6 +269,7 @@ final class WorkspaceModel: ObservableObject {
                 parentAssetID = nil
                 try await saveDraft()
             }
+            scheduleConversationTitles()
         } catch { errorMessage = error.localizedDescription }
     }
     func selectProvider(_ provider: ProviderID) {
@@ -416,7 +454,10 @@ final class WorkspaceModel: ObservableObject {
         project.updatedAt = .now
         project.updateAutomaticTitle(firstMessage: projectBatches.first?.prompt)
         try await library.saveProject(project)
-        if let index = projects.firstIndex(where: { $0.id == project.id }) { projects[index] = project }
+        if let index = projects.firstIndex(where: { $0.id == project.id }) {
+            project.suggestedTitle = projects[index].suggestedTitle ?? project.suggestedTitle
+            projects[index] = project
+        }
     }
     private func preferenceKey(_ name: String) -> String { isDemo ? "demo.\(name)" : name }
     private func saveSettings() {

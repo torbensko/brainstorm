@@ -73,15 +73,19 @@ public struct Project: Identifiable, Sendable, Equatable {
     public let id: UUID
     public var title: String
     public var titleMode: ProjectTitleMode
+    public var suggestedTitle: String?
+    public var displayTitle: String { titleMode == .automatic ? suggestedTitle ?? title : title }
     public var prompt: String
     public var parentAssetID: UUID?
     public var referenceIDs: [UUID]
     public let createdAt: Date
     public var updatedAt: Date
-    public init(id: UUID = UUID(), title: String = "Untitled concept", titleMode: ProjectTitleMode = .automatic, prompt: String = "",
-                parentAssetID: UUID? = nil, referenceIDs: [UUID] = [], createdAt: Date = .now, updatedAt: Date = .now) {
+    public init(id: UUID = UUID(), title: String = "New conversation", titleMode: ProjectTitleMode = .automatic, prompt: String = "",
+                parentAssetID: UUID? = nil, referenceIDs: [UUID] = [], createdAt: Date = .now, updatedAt: Date = .now,
+                suggestedTitle: String? = nil) {
         self.id = id; self.title = title; self.titleMode = titleMode; self.prompt = prompt; self.parentAssetID = parentAssetID
         self.referenceIDs = referenceIDs; self.createdAt = createdAt; self.updatedAt = updatedAt
+        self.suggestedTitle = suggestedTitle
     }
 
     public mutating func updateAutomaticTitle(firstMessage: String? = nil) {
@@ -197,6 +201,6 @@ public enum PromptBuilder {
     }
     public static func title(from prompt: String) -> String {
         let words = prompt.split(whereSeparator: \.isWhitespace).prefix(7).joined(separator: " ")
-        return words.isEmpty ? "Untitled concept" : String(words.prefix(70))
+        return words.isEmpty ? "New conversation" : String(words.prefix(70))
     }
 }

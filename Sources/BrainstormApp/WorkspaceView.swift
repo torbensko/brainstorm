@@ -35,7 +35,7 @@ struct WorkspaceView: View {
                         }
                 } detail: {
                     ConversationView(model: model)
-                    .navigationTitle(model.project?.title ?? "New conversation")
+                    .navigationTitle(model.project?.displayTitle ?? "New conversation")
                     .toolbar {
                         if model.activeJobCount > 0 {
                             ToolbarItem(placement: .primaryAction) {
@@ -104,17 +104,25 @@ struct WorkspaceView: View {
 private struct SidebarView: View {
     @ObservedObject var model: WorkspaceModel
     var body: some View {
+        let summaries = model.conversationSummaries
         List(selection: Binding(get: { model.selectedProjectID }, set: { id in Task { await model.selectProject(id) } })) {
             Section("Conversations") {
                 ForEach(model.visibleProjects) { project in
-                    HStack(alignment: .top, spacing: 9) {
-                        Image(systemName: "bubble.left").foregroundStyle(.secondary).padding(.top, 2)
+                    HStack(alignment: .center, spacing: 10) {
+                        if let image = summaries[project.id]?.latestImage {
+                            AssetImage(url: model.assetURL(image, thumbnail: true))
+                                .frame(width: 38, height: 38)
+                                .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .accessibilityHidden(true)
+                        }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(project.title).lineLimit(2).font(.system(size: 13, weight: .medium))
-                            Text(project.createdAt, format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.secondary)
+                            Text(project.displayTitle).lineLimit(2).font(.system(size: 13, weight: .medium))
+                            Text(summaries[project.id]?.caption ?? "Draft")
+                                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
-                    .padding(.vertical, 5).tag(project.id)
+                    .padding(.vertical, 5).tag(project.id).help(project.displayTitle)
                     .contextMenu {
                         Button("Rename…") { model.renameProject = project }
                         Button("Delete…", role: .destructive) { model.deleteProject = project }
@@ -338,7 +346,7 @@ private struct RenameView: View {
     let project: Project
     @State private var title: String
     @Environment(\.dismiss) private var dismiss
-    init(model: WorkspaceModel, project: Project) { self.model = model; self.project = project; _title = State(initialValue: project.title) }
+    init(model: WorkspaceModel, project: Project) { self.model = model; self.project = project; _title = State(initialValue: project.displayTitle) }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Rename conversation").font(.headline)
