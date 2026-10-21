@@ -10,6 +10,7 @@ enum StudioStyle {
 struct WorkspaceView: View {
     @ObservedObject var model: WorkspaceModel
     @State private var dropTarget = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
         Group {
@@ -20,9 +21,18 @@ struct WorkspaceView: View {
                     Button("Show Library Folder") { model.revealLibrary() }
                 }
             } else {
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: $columnVisibility) {
                     SidebarView(model: model)
                         .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
+                        .toolbar {
+                            ToolbarItem(id: SidebarToolbarPlacement.actionID, placement: .automatic) {
+                                Button { Task { await model.createProject() } } label: {
+                                    Label("New conversation", systemImage: "square.and.pencil")
+                                }
+                                .disabled(model.isImporting || model.isSubmitting || model.isLoading)
+                                .help("New conversation · ⌘N")
+                            }
+                        }
                 } detail: {
                     ConversationView(model: model)
                     .navigationTitle(model.project?.title ?? "New conversation")
@@ -35,12 +45,21 @@ struct WorkspaceView: View {
                                 }
                             }
                         }
+                        ToolbarItem(placement: .primaryAction) {
+                            SettingsLink { Label("Settings", systemImage: "gearshape") }
+                                .help("Settings · ⌘,")
+                        }
                     }
                 }
                 .navigationSplitViewStyle(.balanced)
+                .searchable(text: $model.search, placement: .toolbar, prompt: "Search conversations")
+                .onChange(of: model.search) { _, query in
+                    if !query.isEmpty { withAnimation { columnVisibility = .all } }
+                }
             }
         }
         .tint(StudioStyle.accent)
+        .background(SidebarToolbarPlacement())
         .contentShape(Rectangle())
         .onDrop(of: ReferenceDrop.contentTypes, isTargeted: $dropTarget, perform: model.acceptDrop)
         .overlay {
@@ -86,10 +105,6 @@ private struct SidebarView: View {
     @ObservedObject var model: WorkspaceModel
     var body: some View {
         List(selection: Binding(get: { model.selectedProjectID }, set: { id in Task { await model.selectProject(id) } })) {
-            Button { Task { await model.createProject() } } label: {
-                Label("New conversation", systemImage: "plus").frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain).padding(.vertical, 5)
             Section("Conversations") {
                 ForEach(model.visibleProjects) { project in
                     HStack(alignment: .top, spacing: 9) {
@@ -108,7 +123,6 @@ private struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .searchable(text: $model.search, placement: .sidebar, prompt: "Search conversations")
         .disabled(model.isImporting || model.isSubmitting || model.isLoading)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
@@ -116,9 +130,6 @@ private struct SidebarView: View {
                 Text(model.hasKeys.contains(model.settings.provider) ? model.settings.provider.title : model.settings.provider == .chatGPT ? "Connect ChatGPT" : "Add an API key")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                SettingsLink { Label("Settings", systemImage: "gearshape") }
-                    .labelStyle(.iconOnly).modifier(StudioButtonStyle()).tint(nil as Color?)
-                    .foregroundStyle(.secondary).help("Settings")
             }.padding(14)
         }
     }

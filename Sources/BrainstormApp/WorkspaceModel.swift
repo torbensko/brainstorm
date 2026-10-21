@@ -203,6 +203,7 @@ final class WorkspaceModel: ObservableObject {
             try await library.saveProject(value)
             try await reload()
             restore(value)
+            search = ""
         } catch { errorMessage = error.localizedDescription }
     }
     func generate() async {

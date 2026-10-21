@@ -31,7 +31,7 @@ struct ComposerView: View {
                 }.scrollIndicators(.hidden)
             }
             VStack(alignment: .leading, spacing: 14) {
-                PromptEditor(text: $model.prompt, placeholder: placeholder, focusID: model.parentAssetID,
+                PromptEditor(text: $model.prompt, placeholder: placeholder, focusID: model.parentAssetID ?? model.selectedProjectID,
                              onAttachments: { attachments in Task { await model.importAttachments(attachments) } },
                              onError: { model.errorMessage = $0.localizedDescription },
                              onSubmit: { Task { await model.generate() } })
