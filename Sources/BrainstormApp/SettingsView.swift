@@ -27,6 +27,18 @@ struct SettingsView: View {
                 Text("Conversations, references, and images stay on this Mac. Back up the library folder to keep a copy. API keys stay in Keychain; ChatGPT sign-in is managed by Codex.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("About Brainstorm") {
+                if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                   let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String {
+                    LabeledContent("Version", value: "\(version) (build \(build))")
+                }
+                if let revision = Bundle.main.object(forInfoDictionaryKey: "BrainstormSourceRevision") as? String {
+                    LabeledContent("Source revision", value: revision).textSelection(.enabled)
+                }
+                if let date = Bundle.main.object(forInfoDictionaryKey: "BrainstormBuildDate") as? String {
+                    Text("Built \(date)").font(.caption).foregroundStyle(.secondary)
+                }
+            }
         }
         .formStyle(.grouped).frame(width: 580, height: 620)
         .onChange(of: provider) { _, _ in key = ""; message = nil }

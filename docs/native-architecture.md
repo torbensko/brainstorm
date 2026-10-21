@@ -1,7 +1,7 @@
 ---
 name: Native Brainstorm architecture
 description: Concepts, image revisions, provider boundaries, and durable local generation.
-version: 12
+version: 13
 match: Native macOS app state, storage, image generation, provider adapters, packaging, and tests.
 matchCriteria:
   globs:
@@ -42,5 +42,7 @@ OpenAI API remains an explicit alternative. Its Images API handles both generati
 Model IDs live in the provider catalog. Validate additions against official documentation and add response/request fixtures. Historical batches preserve their original settings. Unknown/retired models should produce an actionable error rather than quietly changing the requested model. API keys are stored only in Keychain, never in library rows or preference files. Existing API batches preserve their billing route; switching the composer to ChatGPT creates new subscription batches rather than rewriting history.
 
 The demo flag replaces providers and credentials with local implementations and uses a separate library. It exercises the real persistence, queue, refinement, and attachment paths without network calls. Sample artwork is deliberately labeled. CI runs offline contract and recovery tests and builds an ad-hoc signed bundle. Packaging explicitly links and verifies the active SDK version separately from the minimum supported macOS version: stamping the deployment target as the SDK opts the app out of modern AppKit appearance even when newer APIs compile successfully. Distribution signing and notarization are explicit build options.
+
+The bundle plist is the source of the release version and build number. Packaging stamps the source revision and UTC build date before signing; Settings exposes those details so local and published builds can be distinguished. Version tags trigger a separate release workflow that validates the tag, tests, signs with the existing distribution certificate, notarises and verifies the app and DMG, then publishes downloads and checksums. Signing material is confined to the temporary runner keychain and removed afterwards.
 
 The old Electron code remains recoverable in Git history. Its data folder is separate from the native library and is never rewritten. The earlier specs and Blint Electron patterns describe the historical implementation.

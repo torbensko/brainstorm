@@ -4,7 +4,9 @@ A native macOS studio for exploring several image designs at once. Built with Sw
 
 ## Use it
 
-Requires macOS 14 or later. Build with Xcode 16 or later and the selected Xcode command-line tools:
+Download the signed, notarised Apple Silicon app from the [latest release](https://github.com/torbensko/brainstorm/releases/latest), open the DMG, and drag Brainstorm into Applications. Requires macOS 14 or later. The native release is **2.0.0 (build 3)**; Settings shows its version, source revision, and build date, and the app menu includes **About Brainstorm**.
+
+To build from source, use Xcode 26 or later and the selected Xcode command-line tools:
 
 ```sh
 make run
@@ -42,7 +44,7 @@ CODE_SIGN_IDENTITY='Developer ID Application: Your Name (TEAMID)' \
 NOTARY_PROFILE='your-notary-profile' ./scripts/build-app.sh
 ```
 
-The script fails if requested signing or notarization fails. CI runs tests and uploads a local-use ZIP; it does not publish releases.
+The script fails if requested signing or notarization fails. Branch CI runs tests and uploads a local-use ZIP. Version tags run the release workflow with the repository's existing distribution certificate and notarisation credentials, publishing a signed, notarised DMG and ZIP plus checksums only after verification. The tag must match the app version, and release notes live in `releases/`.
 
 ## Local data
 
