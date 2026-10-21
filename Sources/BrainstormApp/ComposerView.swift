@@ -3,7 +3,6 @@ import BrainstormCore
 
 struct ComposerView: View {
     @ObservedObject var model: WorkspaceModel
-    @FocusState private var promptFocused: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let parent = model.parentAsset {
@@ -32,9 +31,17 @@ struct ComposerView: View {
                 }.scrollIndicators(.hidden)
             }
             VStack(alignment: .leading, spacing: 14) {
-                TextField(model.parentAssetID == nil ? "Describe the idea you want to explore…" : "What would you like to change?", text: $model.prompt, axis: .vertical)
-                    .font(.system(size: 15)).lineLimit(3...7).textFieldStyle(.plain).focused($promptFocused)
-                    .padding(.horizontal, 3).padding(.top, 3)
+                PromptEditor(text: $model.prompt, placeholder: placeholder, focusID: model.parentAssetID,
+                             onAttachments: { attachments in Task { await model.importAttachments(attachments) } },
+                             onError: { model.errorMessage = $0.localizedDescription },
+                             onSubmit: { Task { await model.generate() } })
+                    .overlay(alignment: .topLeading) {
+                        if model.prompt.isEmpty {
+                            Text(placeholder).font(.system(size: 15)).foregroundStyle(.placeholder)
+                                .padding(.top, 3).allowsHitTesting(false)
+                        }
+                    }
+                    .padding(.horizontal, 3)
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) { controlMenus; Spacer(minLength: 8); generateButton }
                     VStack(alignment: .leading, spacing: 12) {
@@ -60,7 +67,9 @@ struct ComposerView: View {
         }
         .padding(.horizontal, 28).padding(.top, 14).padding(.bottom, 18)
         .disabled(model.isLoading)
-        .onChange(of: model.parentAssetID) { _, new in if new != nil { promptFocused = true } }
+    }
+    private var placeholder: String {
+        model.parentAssetID == nil ? "Describe the idea you want to explore…" : "What would you like to change?"
     }
     @ViewBuilder private var controlMenus: some View {
         Menu {
@@ -83,14 +92,14 @@ struct ComposerView: View {
                 }
             }
         } label: {
-            ComposerPill(title: model.settings.provider == .chatGPT ? nil : "Model", value: modelTitle, icon: "sparkles")
+            Label(model.settings.provider == .chatGPT ? modelTitle : "Model: \(modelTitle)", systemImage: "sparkles")
         }.studioMenu().help("Choose a service and model")
         Menu {
             Picker("Shape", selection: $model.settings.shape) {
                 ForEach(ImageShape.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.inline)
         } label: {
-            ComposerPill(title: "Shape", value: model.settings.shape.title, icon: "aspectratio")
+            Label("Shape: \(model.settings.shape.title)", systemImage: "aspectratio")
         }.studioMenu()
         if model.settings.provider != .chatGPT {
             Menu {
@@ -98,7 +107,7 @@ struct ComposerView: View {
                     ForEach(ImageQuality.allCases) { Text($0.title).tag($0) }
                 }.pickerStyle(.inline)
             } label: {
-                ComposerPill(title: "Quality", value: model.settings.quality.title, icon: "slider.horizontal.3")
+                Label("Quality: \(model.settings.quality.title)", systemImage: "slider.horizontal.3")
             }.studioMenu()
         }
         Menu {
@@ -106,7 +115,7 @@ struct ComposerView: View {
                 ForEach(1...16, id: \.self) { Text("\($0) image\($0 == 1 ? "" : "s")").tag($0) }
             }.pickerStyle(.inline)
         } label: {
-            ComposerPill(value: "\(model.count) image\(model.count == 1 ? "" : "s")", icon: "square.stack")
+            Label("\(model.count) image\(model.count == 1 ? "" : "s")", systemImage: "square.stack")
         }.studioMenu()
     }
     private var modelTitle: String {
@@ -165,28 +174,21 @@ private struct ComposerPillLayout: Layout {
     }
 }
 
-private struct ComposerPill: View {
-    var title: String? = nil
-    let value: String
-    let icon: String
+private struct ComposerPillSurface: ViewModifier {
     @State private var hovering = false
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon).foregroundStyle(.secondary)
-            if let title { Text(title + ":").foregroundStyle(.secondary) }
-            Text(value).fontWeight(.medium).lineLimit(1)
-            Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
-        }
-        .font(.system(size: 12)).foregroundStyle(.primary)
-        .padding(.horizontal, 11).frame(height: 32)
-        .background(hovering ? Color.primary.opacity(0.05) : Color(nsColor: .controlBackgroundColor), in: Capsule())
-        .overlay(Capsule().stroke(Color.primary.opacity(0.12), lineWidth: 1))
-        .contentShape(Capsule()).onHover { hovering = $0 }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel([title, value].compactMap { $0 }.joined(separator: ": "))
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 11).frame(height: 32)
+            .background(hovering ? Color.primary.opacity(0.05) : Color(nsColor: .controlBackgroundColor), in: Capsule())
+            .overlay(Capsule().stroke(Color.primary.opacity(0.12), lineWidth: 1))
+            .contentShape(Capsule()).onHover { hovering = $0 }
     }
 }
 
 private extension View {
-    func studioMenu() -> some View { menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize() }
+    func studioMenu() -> some View {
+        menuStyle(.borderlessButton).menuIndicator(.visible).fixedSize()
+            .font(.system(size: 12, weight: .medium)).foregroundStyle(.primary)
+            .modifier(ComposerPillSurface())
+    }
 }

@@ -51,18 +51,6 @@ struct WorkspaceView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(StudioStyle.canvas)
-                    .overlay {
-                        if dropTarget {
-                            RoundedRectangle(cornerRadius: 16).fill(StudioStyle.accent.opacity(0.1))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(StudioStyle.accent, style: StrokeStyle(lineWidth: 3, dash: [8])))
-                                .overlay(Label("Add reference images", systemImage: "photo.badge.plus").font(.title2).padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16)))
-                                .padding(12).allowsHitTesting(false)
-                        }
-                    }
-                    .dropDestination(for: URL.self) { urls, _ in
-                        guard !urls.isEmpty else { return false }
-                        Task { await model.importFiles(urls) }; return true
-                    } isTargeted: { dropTarget = $0 }
                     .navigationTitle("")
                     .toolbar {
                         ToolbarItem(placement: .principal) {
@@ -89,6 +77,16 @@ struct WorkspaceView: View {
             }
         }
         .tint(StudioStyle.accent)
+        .contentShape(Rectangle())
+        .onDrop(of: ReferenceDrop.contentTypes, isTargeted: $dropTarget, perform: model.acceptDrop)
+        .overlay {
+            if dropTarget {
+                RoundedRectangle(cornerRadius: 16).fill(StudioStyle.accent.opacity(0.1))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(StudioStyle.accent, style: StrokeStyle(lineWidth: 3, dash: [8])))
+                    .overlay(Label("Add reference images", systemImage: "photo.badge.plus").font(.title2).padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16)))
+                    .padding(12).allowsHitTesting(false)
+            }
+        }
         .fileImporter(isPresented: $model.showFileImporter, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): Task { await model.importFiles(urls) }

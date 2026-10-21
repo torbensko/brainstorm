@@ -9,6 +9,7 @@ let package = Package(
         .systemLibrary(name: "CSQLite"),
         .target(name: "BrainstormCore", dependencies: ["CSQLite"]),
         .executableTarget(name: "BrainstormApp", dependencies: ["BrainstormCore"]),
-        .testTarget(name: "BrainstormCoreTests", dependencies: ["BrainstormCore"])
+        .testTarget(name: "BrainstormCoreTests", dependencies: ["BrainstormCore"]),
+        .testTarget(name: "BrainstormAppTests", dependencies: ["BrainstormApp", "BrainstormCore"])
     ]
 )

@@ -100,8 +100,8 @@ final class WorkspaceModel: ObservableObject {
             try await reload()
             let savedID = UserDefaults.standard.string(forKey: isDemo ? "demoSelectedProject" : "selectedProject").flatMap(UUID.init(uuidString:))
             restore(projects.first { $0.id == savedID } ?? projects.first)
-            await refreshKeys()
             isLoading = false
+            await refreshKeys()
             eventTask = Task { [weak self] in
                 for await event in queue.events {
                     guard let self, !Task.isCancelled else { break }
@@ -232,17 +232,43 @@ final class WorkspaceModel: ObservableObject {
     }
     func removeReference(_ id: UUID) { referenceIDs.removeAll { $0 == id }; scheduleSave() }
     func importFiles(_ urls: [URL]) async {
-        guard !isImporting, !isSubmitting else { return }
+        await importReferences { urls.map(ReferenceAttachment.file) }
+    }
+    func importAttachments(_ attachments: [ReferenceAttachment]) async {
+        await importReferences { attachments }
+    }
+    func acceptDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard !providers.isEmpty else { return false }
+        Task {
+            await importReferences {
+                var attachments: [ReferenceAttachment] = []
+                for provider in providers { attachments.append(try await ReferenceDrop.read(provider)) }
+                return attachments
+            }
+        }
+        return true
+    }
+    private func importReferences(_ load: () async throws -> [ReferenceAttachment]) async {
+        guard !isLoading, !isImporting, !isSubmitting else {
+            errorMessage = "Wait for the current operation to finish, then attach your images again."
+            return
+        }
         if project == nil { await createProject(prompt: prompt) }
         guard let projectID = selectedProjectID, let assetStore, let library else { return }
         isImporting = true
         defer { isImporting = false }
         do {
-            guard referenceIDs.count + urls.count + (parentAssetID == nil ? 0 : 1) <= settings.provider.maximumReferences else {
+            let attachments = try await load()
+            guard !attachments.isEmpty else { throw BrainstormError.invalid("No readable images were found to attach.") }
+            guard referenceIDs.count + attachments.count + (parentAssetID == nil ? 0 : 1) <= settings.provider.maximumReferences else {
                 throw BrainstormError.invalid("\(settings.provider.title) supports up to \(settings.provider.maximumReferences) images, including the image being refined.")
             }
-            for url in urls {
-                let asset = try await assetStore.importFile(url, projectID: projectID)
+            for attachment in attachments {
+                let asset: Asset
+                switch attachment {
+                case .file(let url): asset = try await assetStore.importFile(url, projectID: projectID)
+                case .image(let data, let name): asset = try await assetStore.save(data: data, projectID: projectID, name: name, isReference: true)
+                }
                 try await library.addAsset(asset)
                 assets[asset.id] = asset
                 referenceIDs.append(asset.id)
@@ -252,26 +278,13 @@ final class WorkspaceModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
     func pasteImage() async {
-        guard !isImporting, !isSubmitting else { return }
-        let pasteboard = NSPasteboard.general
-        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
-            await importFiles(urls); return
-        }
-        guard let data = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) else {
-            errorMessage = "Copy an image or an image file, then choose Paste Reference Image."; return
-        }
-        if project == nil { await createProject(prompt: prompt) }
-        guard let id = selectedProjectID, let assetStore, let library else { return }
-        isImporting = true
-        defer { isImporting = false }
         do {
-            guard referenceIDs.count + (parentAssetID == nil ? 0 : 1) < settings.provider.maximumReferences else {
-                throw BrainstormError.invalid("Remove a reference before pasting another image.")
+            let attachments = try ReferenceDrop.read(.general)
+            guard !attachments.isEmpty else {
+                errorMessage = "Copy an image or an image file, then choose Paste Reference Image."
+                return
             }
-            let asset = try await assetStore.save(data: data, projectID: id, name: "Pasted image", isReference: true)
-            try await library.addAsset(asset)
-            assets[asset.id] = asset; referenceIDs.append(asset.id)
-            try await saveDraft()
+            await importAttachments(attachments)
         } catch { errorMessage = error.localizedDescription }
     }
     func retry(_ job: GenerationJob) async {
