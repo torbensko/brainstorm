@@ -13,9 +13,9 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var referenceIDs: [UUID] = []
     @Published private(set) var parentAssetID: UUID?
     @Published var settings = GenerationSettings() { didSet { saveSettings() } }
-    @Published var count = 4 { didSet { UserDefaults.standard.set(count, forKey: "generationCount") } }
+    @Published var count = 4 { didSet { UserDefaults.standard.set(count, forKey: preferenceKey("generationCount")) } }
     @Published var concurrency = 3 { didSet {
-        UserDefaults.standard.set(concurrency, forKey: "concurrency")
+        UserDefaults.standard.set(concurrency, forKey: preferenceKey("concurrency"))
         if let queue { Task { await queue.setConcurrency(concurrency) } }
     } }
     @Published var search = ""
@@ -38,6 +38,7 @@ final class WorkspaceModel: ObservableObject {
     private var credentials: (any CredentialStore)?
     private var queue: GenerationQueue?
     private var started = false
+    private var libraryLock: LibraryLock?
     private var restoring = false
     private var saveTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
@@ -62,6 +63,7 @@ final class WorkspaceModel: ObservableObject {
             let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let root = support.appendingPathComponent(isDemo ? "Brainstorm Native Demo" : "Brainstorm Native", isDirectory: true)
             libraryURL = root
+            libraryLock = try LibraryLock(root: root)
             let library = try LibraryStore(url: root.appendingPathComponent("library.sqlite"))
             let assetStore = try AssetStore(root: root.appendingPathComponent("Images", isDirectory: true))
             self.library = library; self.assetStore = assetStore
@@ -73,13 +75,13 @@ final class WorkspaceModel: ObservableObject {
             let queue = GenerationQueue(library: library, assets: assetStore, credentials: credentials, providers: providers)
             self.queue = queue
             try await queue.prepare()
-            if let data = UserDefaults.standard.data(forKey: "generationSettings") {
+            if let data = UserDefaults.standard.data(forKey: preferenceKey("generationSettings")) {
                 settings = try JSONDecoder().decode(GenerationSettings.self, from: data)
                 try settings.validate()
             }
-            let savedCount = UserDefaults.standard.integer(forKey: "generationCount")
+            let savedCount = UserDefaults.standard.integer(forKey: preferenceKey("generationCount"))
             if (1...16).contains(savedCount) { count = savedCount }
-            let savedConcurrency = UserDefaults.standard.integer(forKey: "concurrency")
+            let savedConcurrency = UserDefaults.standard.integer(forKey: preferenceKey("concurrency"))
             if (1...6).contains(savedConcurrency) { concurrency = savedConcurrency }
             await queue.setConcurrency(concurrency)
             try await reload()
@@ -135,7 +137,7 @@ final class WorkspaceModel: ObservableObject {
             var value = Project(title: PromptBuilder.title(from: newPrompt), prompt: newPrompt)
             try await library.saveProject(value)
             for reference in references {
-                let copied = try await assetStore.importFile(assetStore.url(for: reference), projectID: value.id)
+                let copied = try await assetStore.importFile(assetStore.url(for: reference), projectID: value.id, name: reference.name)
                 try await library.addAsset(copied)
                 value.referenceIDs.append(copied.id)
             }
@@ -184,7 +186,7 @@ final class WorkspaceModel: ObservableObject {
     }
     func removeReference(_ id: UUID) { referenceIDs.removeAll { $0 == id }; scheduleSave() }
     func importFiles(_ urls: [URL]) async {
-        guard !isImporting else { return }
+        guard !isImporting, !isSubmitting else { return }
         if project == nil { await createProject(prompt: prompt) }
         guard let projectID = selectedProjectID, let assetStore, let library else { return }
         isImporting = true
@@ -204,6 +206,7 @@ final class WorkspaceModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
     func pasteImage() async {
+        guard !isImporting, !isSubmitting else { return }
         let pasteboard = NSPasteboard.general
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
             await importFiles(urls); return
@@ -213,6 +216,8 @@ final class WorkspaceModel: ObservableObject {
         }
         if project == nil { await createProject(prompt: prompt) }
         guard let id = selectedProjectID, let assetStore, let library else { return }
+        isImporting = true
+        defer { isImporting = false }
         do {
             guard referenceIDs.count + (parentAssetID == nil ? 0 : 1) < settings.provider.maximumReferences else {
                 throw BrainstormError.invalid("Remove a reference before pasting another image.")
@@ -330,8 +335,9 @@ final class WorkspaceModel: ObservableObject {
         try await library.saveProject(project)
         if let index = projects.firstIndex(where: { $0.id == project.id }) { projects[index] = project }
     }
+    private func preferenceKey(_ name: String) -> String { isDemo ? "demo.\(name)" : name }
     private func saveSettings() {
-        do { UserDefaults.standard.set(try JSONEncoder().encode(settings), forKey: "generationSettings") }
+        do { UserDefaults.standard.set(try JSONEncoder().encode(settings), forKey: preferenceKey("generationSettings")) }
         catch { errorMessage = error.localizedDescription }
     }
 }

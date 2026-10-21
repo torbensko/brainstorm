@@ -178,3 +178,49 @@ func waitUntil(_ condition: @escaping @Sendable () async throws -> Bool) async t
     #expect(prompt.contains("first attached image"))
     #expect(prompt.contains("Make the sun blue"))
 }
+
+@Test func cancelledQueuedJobCannotBeClaimed() async throws {
+    let fixture = try Fixture()
+    let batch = try await fixture.batch(count: 1)
+    try await fixture.library.addBatch(batch)
+    try await fixture.library.cancelJob(batch.jobs[0].id)
+    #expect(try await fixture.library.startJob(batch.jobs[0].id) == false)
+    let saved = try #require(try await fixture.library.batch(id: batch.id))
+    #expect(saved.jobs[0].status == .cancelled && saved.jobs[0].attempts == 0)
+}
+
+@Test func importedReferenceSurvivesMovingItsSource() async throws {
+    let fixture = try Fixture()
+    let batch = try await fixture.batch(count: 1)
+    let source = fixture.root.appendingPathComponent("reference.png")
+    try testPNG().write(to: source)
+    let asset = try await fixture.assets.importFile(source, projectID: batch.projectID, name: "Original reference.png")
+    try await fixture.library.addAsset(asset)
+    try FileManager.default.removeItem(at: source)
+    let reference = try await fixture.assets.reference(asset)
+    #expect(!reference.data.isEmpty && reference.mimeType == "image/png")
+    #expect(asset.name == "Original reference.png")
+    #expect(FileManager.default.fileExists(atPath: fixture.assets.url(for: asset, thumbnail: true).path))
+}
+
+actor RateLimitedProvider: ImageProvider {
+    private(set) var calls = 0
+    func generate(prompt: String, references: [ImageReference], settings: GenerationSettings, apiKey: String) async throws -> ImageOutput {
+        calls += 1
+        if calls == 1 { throw ProviderHTTPError(status: 429, message: "Rate limited", retryAfter: 0, mayRetry: true) }
+        return ImageOutput(data: try testPNG())
+    }
+    func refinePrompt(_ prompt: String, direction: String, references: [ImageReference], apiKey: String) async throws -> String { prompt }
+}
+
+@Test func rateLimitedJobRetriesWithoutDuplicatingItsSlot() async throws {
+    let fixture = try Fixture()
+    let provider = RateLimitedProvider()
+    let queue = GenerationQueue(library: fixture.library, assets: fixture.assets, credentials: TestCredentials(), providers: ProviderRegistry(providers: [.openAI: provider]))
+    let batch = try await fixture.batch(count: 1)
+    try await queue.submit(batch)
+    try await waitUntil { try await fixture.library.batch(id: batch.id)?.completedCount == 1 }
+    let saved = try #require(try await fixture.library.batch(id: batch.id))
+    #expect(saved.jobs.count == 1 && saved.jobs[0].attempts == 2)
+    #expect(await provider.calls == 2)
+}

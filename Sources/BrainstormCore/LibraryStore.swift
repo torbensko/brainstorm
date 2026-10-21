@@ -95,8 +95,9 @@ public actor LibraryStore {
         }
     }
 
-    public func startJob(_ id: UUID) throws {
-        try db.execute("UPDATE jobs SET status='running',error=NULL,attempts=attempts+1 WHERE id=? AND status='queued'", [.id(id)])
+    @discardableResult
+    public func startJob(_ id: UUID) throws -> Bool {
+        !((try db.execute("UPDATE jobs SET status='running',error=NULL,attempts=attempts+1 WHERE id=? AND status='queued' RETURNING id", [.id(id)])).isEmpty)
     }
 
     public func recordRetry(_ id: UUID) throws {

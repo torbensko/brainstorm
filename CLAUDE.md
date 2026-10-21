@@ -43,23 +43,7 @@ For frontmatter fields (`name`, `description`, `version`, `match`, `matchCriteri
 <!-- blint:patterns v2 -->
 ## Patterns
 
-### A General-Purpose Async Loading Component for React Query
-One way to centralise loading, error, and retry UI for React Query without leaking query state into every component.
-*Applies to:* React components that render async data, pages or views with loading/error states, and any component that calls useQuery or useMutation
-*Files matching:* `src/renderer/**/*.tsx`
-*Reference:* `.blint/patterns/a-general-purpose-async-loading-component-for-react-query.md`
-
-### Electron App Architecture
-Architectural conventions for building an Electron app with Vite, React, Tailwind, shadcn/ui, and typed IPC
-*Applies to:* Electron main process entry, preload scripts, Vite configs for main/preload/renderer, IPC handler registrations, window creation helpers, React app root, and build configuration
-*Files matching:* `electron/**/*`, `src/main/**/*`, `src/renderer/**/*`, `src/shared/**/*`, `vite.*.config.mjs`, `forge.config.ts`
-*Reference:* `.blint/patterns/electron-app-architecture.md`
-
-### Electron Release Pipeline
-GitHub Actions CI/CD for building, signing, distributing, and auto-updating an Electron app via S3/CloudFront
-*Applies to:* GitHub Actions workflow files for releasing the Electron app, Electron Forge config, UpdateService, update IPC handlers, update provider components, Squirrel lifecycle handling, and entitlements plists
-*Files matching:* `.github/workflows/*`, `forge.config.ts`, `**/*.plist`
-*Reference:* `.blint/patterns/electron-release-pipeline.md`
+The Electron patterns in `.blint/patterns/` describe the previous implementation. The user authorized a native SwiftUI rewrite; those technology-specific patterns do not govern the native code. Preserve unrelated local Blint changes.
 <!-- /blint:patterns -->
 
 <!-- blint:about v1 -->
@@ -190,4 +174,10 @@ sessionId: <agent-sdk-session-id>
 <!-- /blint:authoring -->
 
 <!-- blint:docs v1 -->
+## Documentation
+
+### Native Brainstorm architecture
+Concepts, image revisions, provider boundaries, and durable local generation.
+*Applies to:* Swift app state, storage, networking, generation queue, packaging, and tests.
+*Reference:* `docs/native-architecture.md`
 <!-- /blint:docs -->

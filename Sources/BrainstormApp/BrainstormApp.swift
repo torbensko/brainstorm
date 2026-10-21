@@ -10,7 +10,7 @@ struct BrainstormApp: App {
         Window("Brainstorm", id: "workspace") {
             WorkspaceView(model: model)
                 .frame(minWidth: 1000, minHeight: 720)
-                .task { await model.start() }
+                .task { appDelegate.workspace = model; await model.start() }
         }
         .defaultSize(width: 1360, height: 920)
         .commands {
@@ -29,9 +29,18 @@ struct BrainstormApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    weak var workspace: WorkspaceModel?
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let workspace else { return .terminateNow }
+        Task {
+            do { try await workspace.saveDraft(); sender.reply(toApplicationShouldTerminate: true) }
+            catch { workspace.errorMessage = "Could not save your draft: \(error.localizedDescription)"; sender.reply(toApplicationShouldTerminate: false) }
+        }
+        return .terminateLater
+    }
 }

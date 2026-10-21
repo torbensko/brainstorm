@@ -11,14 +11,14 @@ public actor AssetStore {
     public nonisolated func url(for asset: Asset, thumbnail: Bool = false) -> URL {
         root.appendingPathComponent(thumbnail ? asset.thumbnailFilename : asset.filename)
     }
-    public func importFile(_ url: URL, projectID: UUID) throws -> Asset {
+    public func importFile(_ url: URL, projectID: UUID, name: String? = nil) throws -> Asset {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
         guard values.isRegularFile == true, let size = values.fileSize, size <= 30_000_000 else {
             throw BrainstormError.invalid("Choose an image file smaller than 30 MB.")
         }
-        return try save(data: Data(contentsOf: url), projectID: projectID, name: url.lastPathComponent, isReference: true)
+        return try save(data: Data(contentsOf: url), projectID: projectID, name: name ?? url.lastPathComponent, isReference: true)
     }
     public func save(data: Data, projectID: UUID, name: String, isReference: Bool = false) throws -> Asset {
         guard data.count <= 60_000_000,

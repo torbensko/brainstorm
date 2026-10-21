@@ -11,6 +11,7 @@ public actor GenerationQueue {
     private let providers: ProviderRegistry
     private var concurrency: Int
     private var tasks: [UUID: Task<Void, Never>] = [:]
+    private var cancelledIDs: Set<UUID> = []
     private var pumping = false
 
     public init(library: LibraryStore, assets: AssetStore, credentials: any CredentialStore,
@@ -32,6 +33,7 @@ public actor GenerationQueue {
         await pump()
     }
     public func cancel(_ id: UUID) async throws {
+        cancelledIDs.insert(id)
         try await library.cancelJob(id)
         tasks[id]?.cancel()
         continuation.yield(.changed)
@@ -39,6 +41,7 @@ public actor GenerationQueue {
     }
     public func retry(_ id: UUID) async throws {
         guard tasks[id] == nil else { throw BrainstormError.invalid("This request is still stopping. Try again in a moment.") }
+        cancelledIDs.remove(id)
         try await library.retryJob(id)
         continuation.yield(.changed)
         await pump()
@@ -54,7 +57,7 @@ public actor GenerationQueue {
         do {
             while tasks.count < concurrency,
                   let (batch, job) = try await library.nextQueued(excluding: Set(tasks.keys)) {
-                try await library.startJob(job.id)
+                guard try await library.startJob(job.id), !cancelledIDs.contains(job.id) else { continue }
                 tasks[job.id] = Task { await self.execute(batch: batch, job: job) }
                 continuation.yield(.changed)
             }
@@ -91,6 +94,7 @@ public actor GenerationQueue {
             catch { continuation.yield(.error("Could not remove an unused image: \(error.localizedDescription)")) }
         }
         tasks[job.id] = nil
+        cancelledIDs.remove(job.id)
         continuation.yield(.changed)
         await pump()
     }

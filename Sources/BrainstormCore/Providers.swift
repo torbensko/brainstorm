@@ -83,6 +83,9 @@ public struct ProviderClient: Sendable {
         request.setValue(provider == .openAI ? "Bearer \(apiKey)" : apiKey,
                          forHTTPHeaderField: provider == .openAI ? "Authorization" : "x-goog-api-key")
         request.httpBody = try JSONEncoder().encode(body)
+        if provider == .gemini, let size = request.httpBody?.count, size > 20_000_000 {
+            throw BrainstormError.invalid("These references exceed Gemini’s inline request limit. Use fewer or smaller images.")
+        }
         let response = try await transport.send(request)
         guard (200..<300).contains(response.status) else {
             let error = try? JSONDecoder().decode(ErrorBody.self, from: response.data)
