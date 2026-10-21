@@ -50,10 +50,11 @@ struct WorkspaceView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(StudioStyle.canvas)
+                    .background(StudioStyle.canvas.ignoresSafeArea(.container, edges: .top))
                     .navigationTitle("")
+                    .toolbarBackground(.hidden, for: .windowToolbar)
                     .toolbar {
-                        ToolbarItem(placement: .principal) {
+                        ToolbarItem(placement: .navigation) {
                             HStack(spacing: 9) {
                                 Image(nsImage: NSApplication.shared.applicationIconImage)
                                     .resizable().scaledToFit().frame(width: 26, height: 26)
@@ -63,17 +64,23 @@ struct WorkspaceView: View {
                                     .help(model.project?.title ?? "New conversation")
                             }
                         }
-                        ToolbarItem(placement: .primaryAction) {
-                            HStack(spacing: 12) {
-                                if model.activeJobCount > 0 {
+                        if #available(macOS 26.0, *) {
+                            ToolbarSpacer(.flexible)
+                        }
+                        if model.activeJobCount > 0 {
+                            ToolbarItem(placement: .primaryAction) {
+                                HStack(spacing: 8) {
                                     ProgressView().controlSize(.small)
                                     Text("\(model.activeJobCount) in progress").font(.caption).foregroundStyle(.secondary)
                                 }
-                                SettingsLink { Image(systemName: "slider.horizontal.3") }.help("Settings")
                             }
+                        }
+                        ToolbarItem(placement: .primaryAction) {
+                            SettingsLink { Label("Settings", systemImage: "gearshape") }.help("Settings")
                         }
                     }
                 }
+                .navigationSplitViewStyle(.balanced)
             }
         }
         .tint(StudioStyle.accent)
@@ -121,44 +128,37 @@ struct WorkspaceView: View {
 private struct SidebarView: View {
     @ObservedObject var model: WorkspaceModel
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.tertiary)
-                TextField("Search", text: $model.search).textFieldStyle(.plain)
-            }.padding(8).background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 14).padding(.top, 16)
+        List(selection: Binding(get: { model.selectedProjectID }, set: { id in Task { await model.selectProject(id) } })) {
             Button { Task { await model.createProject() } } label: {
                 Label("New conversation", systemImage: "plus").frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10).padding(.vertical, 9)
-                    .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
             }
-            .buttonStyle(.plain).padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 18)
-            List(selection: Binding(get: { model.selectedProjectID }, set: { id in Task { await model.selectProject(id) } })) {
-                Section("Conversations") {
-                    ForEach(model.visibleProjects) { project in
-                        HStack(alignment: .top, spacing: 9) {
-                            Image(systemName: "bubble.left").foregroundStyle(.secondary).padding(.top, 2)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(project.title).lineLimit(2).font(.system(size: 13, weight: .medium))
-                                Text(project.createdAt, format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.tertiary)
-                            }
+            .buttonStyle(.plain).padding(.vertical, 5)
+            Section("Conversations") {
+                ForEach(model.visibleProjects) { project in
+                    HStack(alignment: .top, spacing: 9) {
+                        Image(systemName: "bubble.left").foregroundStyle(.secondary).padding(.top, 2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(project.title).lineLimit(2).font(.system(size: 13, weight: .medium))
+                            Text(project.createdAt, format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 7).tag(project.id)
-                        .contextMenu {
-                            Button("Rename…") { model.renameProject = project }
-                            Button("Delete…", role: .destructive) { model.deleteProject = project }
-                        }
+                    }
+                    .padding(.vertical, 5).tag(project.id)
+                    .contextMenu {
+                        Button("Rename…") { model.renameProject = project }
+                        Button("Delete…", role: .destructive) { model.deleteProject = project }
                     }
                 }
             }
-            .listStyle(.sidebar).scrollContentBackground(.hidden)
-            Divider().padding(.horizontal, 14)
+        }
+        .listStyle(.sidebar)
+        .searchable(text: $model.search, placement: .sidebar, prompt: "Search conversations")
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             HStack {
                 Circle().fill(model.hasKeys.contains(model.settings.provider) ? StudioStyle.accent : Color.orange).frame(width: 6, height: 6)
                 Text(model.hasKeys.contains(model.settings.provider) ? model.settings.provider.title : model.settings.provider == .chatGPT ? "Connect ChatGPT" : "Add an API key")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                SettingsLink { Image(systemName: "gearshape") }.buttonStyle(.plain)
-            }.padding(17)
+            }.padding(14)
         }
         .disabled(model.isImporting || model.isSubmitting || model.isLoading)
     }

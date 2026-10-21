@@ -1,7 +1,7 @@
 ---
 name: Native Brainstorm architecture
 description: Concepts, image revisions, provider boundaries, and durable local generation.
-version: 5
+version: 6
 match: Native macOS app state, storage, image generation, provider adapters, packaging, and tests.
 matchCriteria:
   globs:
@@ -17,7 +17,7 @@ A concept owns a draft and a sequence of generation sets. Each set captures its 
 
 The SwiftUI app owns navigation and editable drafts. BrainstormCore owns persistence, files, credentials, provider calls, and generation scheduling. The app observes queue events and reloads metadata; previews load separately. Provider calls never depend on an active view or selected concept.
 
-The interface presents concepts as conversations. The sidebar provides search and navigation; the toolbar shows the existing app logo beside the conversation title. A new conversation centers the composer under an opening prompt, then moves the composer below the image history after generation. Shared pill controls give model, shape, quality, and image count a consistent treatment and wrap when space is limited. Subscription mode omits quality because Codex manages it.
+The interface presents concepts as conversations. A native sidebar list provides search and navigation within a standard macOS split window. The toolbar places the app logo and conversation title at the leading edge of the detail column, with Settings at the trailing edge; system window controls and sidebar materials remain native. A new conversation centers the composer under an opening prompt, then moves the composer below the image history after generation. Shared pill controls give model, shape, quality, and image count a consistent treatment and wrap when space is limited. Subscription mode omits quality because Codex manages it.
 
 File selection, image drops, and image paste share the same reference import path. The workspace accepts file URLs and image data; the native prompt editor intercepts attachments before AppKit can insert a file path into the text. A drag item with both representations attaches only once. Imports preserve order, lock conversation navigation until complete, and surface unreadable images as errors. Local editing and attachments become available when the library opens, independently of the provider connection check.
 

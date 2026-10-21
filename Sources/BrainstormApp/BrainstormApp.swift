@@ -13,7 +13,7 @@ struct BrainstormApp: App {
                 .task { appDelegate.workspace = model; await model.start() }
         }
         .defaultSize(width: 1360, height: 920)
-        .windowToolbarStyle(.unified(showsTitle: false))
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Conversation") { Task { await model.createProject() } }
