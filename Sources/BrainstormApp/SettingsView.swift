@@ -30,10 +30,12 @@ struct SettingsView: View {
             }
             Section("Updates") {
                 Toggle("Automatically check for updates", isOn: Binding(
-                    get: { updates.automaticallyChecksForUpdates }, set: updates.setAutomaticChecks
+                    get: { updates.automaticallyChecksForUpdates },
+                    set: { updates.setAutomaticChecks($0) }
                 ))
                 Toggle("Automatically download and install updates", isOn: Binding(
-                    get: { updates.automaticallyDownloadsUpdates }, set: updates.setAutomaticDownloads
+                    get: { updates.automaticallyDownloadsUpdates },
+                    set: { updates.setAutomaticDownloads($0) }
                 ))
                 .disabled(!updates.automaticallyChecksForUpdates)
                 HStack {

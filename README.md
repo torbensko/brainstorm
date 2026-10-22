@@ -4,7 +4,7 @@ A native macOS studio for exploring several image designs at once. Built with Sw
 
 ## Use it
 
-Download the signed, notarised Apple Silicon app from the [latest release](https://github.com/torbensko/brainstorm/releases/latest), open the DMG, and drag Brainstorm into Applications. Requires macOS 14 or later. The native release is **2.1.0 (build 4)**; Settings shows its version, source revision, and build date, and the app menu includes **About Brainstorm**.
+Download the signed, notarised Apple Silicon app from the [latest release](https://github.com/torbensko/brainstorm/releases/latest), open the DMG, and drag Brainstorm into Applications. Requires macOS 14 or later. The native release is **2.1.1 (build 5)**; Settings shows its version, source revision, and build date, and the app menu includes **About Brainstorm**.
 
 Sparkle checks for updates automatically and downloads them to install when you quit. Use **Brainstorm → Check for Updates…** to check and install immediately, or change automatic update preferences in Settings. Install version 2.1 manually once if you are upgrading from 2.0 or the old Electron app; subsequent releases update the installed copy in place.
 
