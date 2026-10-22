@@ -3,6 +3,7 @@ import BrainstormCore
 
 struct SettingsView: View {
     @ObservedObject var model: WorkspaceModel
+    @ObservedObject var updates: AppUpdater
     @State private var provider = ProviderID.chatGPT
     @State private var key = ""
     @State private var message: String?
@@ -27,6 +28,27 @@ struct SettingsView: View {
                 Text("Conversations, references, and images stay on this Mac. Back up the library folder to keep a copy. API keys stay in Keychain; ChatGPT sign-in is managed by Codex.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("Updates") {
+                Toggle("Automatically check for updates", isOn: Binding(
+                    get: { updates.automaticallyChecksForUpdates }, set: updates.setAutomaticChecks
+                ))
+                Toggle("Automatically download and install updates", isOn: Binding(
+                    get: { updates.automaticallyDownloadsUpdates }, set: updates.setAutomaticDownloads
+                ))
+                .disabled(!updates.automaticallyChecksForUpdates)
+                HStack {
+                    Button("Check for Updates…") { updates.checkForUpdates() }
+                        .disabled(!updates.canCheckForUpdates)
+                    Spacer()
+                    if let date = updates.lastUpdateCheckDate {
+                        Text("Last checked \(date.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Text("Downloaded updates install when you quit. You can also check and install an update immediately.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .disabled(model.isDemo)
             Section("About Brainstorm") {
                 if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
                    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String {

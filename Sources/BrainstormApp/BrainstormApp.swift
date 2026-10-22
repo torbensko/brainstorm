@@ -5,16 +5,25 @@ import BrainstormCore
 struct BrainstormApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = WorkspaceModel()
+    @StateObject private var updates = AppUpdater()
 
     var body: some Scene {
         Window("Brainstorm", id: "workspace") {
             WorkspaceView(model: model)
                 .frame(minWidth: 1000, minHeight: 720)
-                .task { appDelegate.workspace = model; await model.start() }
+                .task {
+                    appDelegate.workspace = model
+                    if !model.isDemo { updates.start() }
+                    await model.start()
+                }
         }
         .defaultSize(width: 1360, height: 920)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { updates.checkForUpdates() }
+                    .disabled(!updates.canCheckForUpdates || model.isDemo)
+            }
             CommandGroup(replacing: .newItem) {
                 Button("New Conversation") { Task { await model.createProject() } }
                     .keyboardShortcut("n")
@@ -24,7 +33,7 @@ struct BrainstormApp: App {
                     .keyboardShortcut("v", modifiers: [.command, .shift])
             }
         }
-        Settings { SettingsView(model: model) }
+        Settings { SettingsView(model: model, updates: updates) }
     }
 }
 

@@ -68,17 +68,27 @@ jobs:
           xcrun stapler staple "dist/$artifact.dmg"
           xcrun stapler validate "dist/$artifact.dmg"
           spctl --assess --type open --context context:primary-signature --verbose "dist/$artifact.dmg"
+          cp "dist/$artifact.dmg" dist/Brainstorm-macOS-arm64.dmg
           cd dist
           shasum -a 256 "$artifact.zip" "$artifact.dmg" > SHA256SUMS.txt
+      - name: Sign Sparkle update feed
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          test -n "$SPARKLE_PRIVATE_KEY"
+          ./scripts/generate-appcast.sh
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | .build/artifacts/sparkle/Sparkle/bin/sign_update --ed-key-file - --verify dist/appcast.xml
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" --verify-tag --title "Brainstorm $RELEASE_VERSION" \
+          gh release create "$RELEASE_TAG" --draft --verify-tag --title "Brainstorm $RELEASE_VERSION" \
             --notes-file "releases/$RELEASE_VERSION.md" \
             "dist/Brainstorm-$RELEASE_VERSION-macOS-arm64.zip" \
-            "dist/Brainstorm-$RELEASE_VERSION-macOS-arm64.dmg" dist/SHA256SUMS.txt
+            "dist/Brainstorm-$RELEASE_VERSION-macOS-arm64.dmg" dist/Brainstorm-macOS-arm64.dmg \
+            dist/SHA256SUMS.txt dist/appcast.xml
+          gh release edit "$RELEASE_TAG" --draft=false --latest
       - name: Remove signing material
         if: always()
         run: |

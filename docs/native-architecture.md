@@ -1,7 +1,7 @@
 ---
 name: Native Brainstorm architecture
 description: Concepts, image revisions, provider boundaries, and durable local generation.
-version: 13
+version: 14
 match: Native macOS app state, storage, image generation, provider adapters, packaging, and tests.
 matchCriteria:
   globs:
@@ -44,5 +44,9 @@ Model IDs live in the provider catalog. Validate additions against official docu
 The demo flag replaces providers and credentials with local implementations and uses a separate library. It exercises the real persistence, queue, refinement, and attachment paths without network calls. Sample artwork is deliberately labeled. CI runs offline contract and recovery tests and builds an ad-hoc signed bundle. Packaging explicitly links and verifies the active SDK version separately from the minimum supported macOS version: stamping the deployment target as the SDK opts the app out of modern AppKit appearance even when newer APIs compile successfully. Distribution signing and notarization are explicit build options.
 
 The bundle plist is the source of the release version and build number. Packaging stamps the source revision and UTC build date before signing; Settings exposes those details so local and published builds can be distinguished. Version tags trigger a separate release workflow that validates the tag, tests, signs with the existing distribution certificate, notarises and verifies the app and DMG, then publishes downloads and checksums. Signing material is confined to the temporary runner keychain and removed afterwards.
+
+One Sparkle controller lives for the app's lifetime and owns update scheduling, preferences, presentation, and installation. Settings and the app menu observe that same controller. Automatic checks and downloading are enabled by default through the bundle plist; downloaded updates install on quit, so the normal draft-save and queue-shutdown path remains in control. Demo mode never starts the updater. Updates replace the running bundle, so distributed copies belong in Applications.
+
+Sparkle is a pinned binary Swift package. Packaging embeds its framework with symlinks intact and signs helpers from the inside out before signing the app; distribution enables hardened runtime throughout. Ad-hoc local builds omit hardened runtime because they lack the Team ID required for library validation. The release workflow generates an EdDSA-signed feed and archive using a dedicated repository secret, matching the public key embedded in the app. Both feed verification and archive verification before extraction are required. GitHub's latest-release asset URL is the stable feed address, and versioned release assets are the download targets. Publishing the feed together with verified downloads avoids advertising an incomplete release. Build numbers must increase for every release.
 
 The old Electron code remains recoverable in Git history. Its data folder is separate from the native library and is never rewritten. The earlier specs and Blint Electron patterns describe the historical implementation.

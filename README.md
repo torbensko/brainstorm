@@ -4,7 +4,9 @@ A native macOS studio for exploring several image designs at once. Built with Sw
 
 ## Use it
 
-Download the signed, notarised Apple Silicon app from the [latest release](https://github.com/torbensko/brainstorm/releases/latest), open the DMG, and drag Brainstorm into Applications. Requires macOS 14 or later. The native release is **2.0.0 (build 3)**; Settings shows its version, source revision, and build date, and the app menu includes **About Brainstorm**.
+Download the signed, notarised Apple Silicon app from the [latest release](https://github.com/torbensko/brainstorm/releases/latest), open the DMG, and drag Brainstorm into Applications. Requires macOS 14 or later. The native release is **2.1.0 (build 4)**; Settings shows its version, source revision, and build date, and the app menu includes **About Brainstorm**.
+
+Sparkle checks for updates automatically and downloads them to install when you quit. Use **Brainstorm → Check for Updates…** to check and install immediately, or change automatic update preferences in Settings. Install version 2.1 manually once if you are upgrading from 2.0 or the old Electron app; subsequent releases update the installed copy in place.
 
 To build from source, use Xcode 26 or later and the selected Xcode command-line tools:
 
@@ -35,9 +37,9 @@ make demo      # separate demo library, local artwork, no API calls
 make app       # release app bundle and ZIP
 ```
 
-Open `Package.swift` in Xcode to work on the app. No external Swift package dependencies are required; SQLite is supplied by macOS. The build script uses the host architecture. Set `CONFIGURATION=debug` for a debug bundle.
+Open `Package.swift` in Xcode to work on the app. Sparkle is pinned through Swift Package Manager; SQLite is supplied by macOS. The build script embeds Sparkle and signs its helpers before signing Brainstorm. It uses the host architecture. Set `CONFIGURATION=debug` for a debug bundle.
 
-Builds are ad-hoc signed for local use. For distribution, provide `CODE_SIGN_IDENTITY` with an installed Developer ID identity and optionally `NOTARY_PROFILE` with an existing notarytool Keychain profile:
+Builds are ad-hoc signed for local use without hardened runtime library validation, which requires a Team ID. For distribution, provide `CODE_SIGN_IDENTITY` with an installed Developer ID identity to enable hardened runtime, and optionally `NOTARY_PROFILE` with an existing notarytool Keychain profile:
 
 ```sh
 CODE_SIGN_IDENTITY='Developer ID Application: Your Name (TEAMID)' \
@@ -45,6 +47,8 @@ NOTARY_PROFILE='your-notary-profile' ./scripts/build-app.sh
 ```
 
 The script fails if requested signing or notarization fails. Branch CI runs tests and uploads a local-use ZIP. Version tags run the release workflow with the repository's existing distribution certificate and notarisation credentials, publishing a signed, notarised DMG and ZIP plus checksums only after verification. The tag must match the app version, and release notes live in `releases/`.
+
+Every release also publishes `appcast.xml`; installed apps use the stable GitHub `releases/latest/download/appcast.xml` URL. Sparkle generates and signs the feed, embedded release notes, and update archive using the repository's `SPARKLE_PRIVATE_KEY` secret. The public key is in the bundle plist; the private key is backed up in the maintainer's login Keychain under account `app.brainstorm.native`. It must be retained across releases. Increment both the marketing version and the numeric build number for each release; Sparkle compares build numbers. Feed generation and validation must succeed before publication.
 
 ## Local data
 
